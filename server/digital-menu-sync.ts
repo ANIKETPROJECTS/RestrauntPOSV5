@@ -108,6 +108,11 @@ export class DigitalMenuSyncService {
           if (this.processedOrderIds.has(orderId)) continue;
           
           try {
+            // CRITICAL: Add to processedOrderIds IMMEDIATELY to prevent duplicate processing in race conditions
+            this.processedOrderIds.add(orderId);
+            this.orderStatusMap.set(orderId, digitalOrder.status);
+            this.orderPaymentStatusMap.set(orderId, digitalOrder.paymentStatus || 'pending');
+            
             // Add customer info to order for processing
             const orderWithCustomer = {
               ...digitalOrder,
@@ -118,9 +123,6 @@ export class DigitalMenuSyncService {
             };
             
             const posOrderId = await this.convertAndCreatePOSOrder(orderWithCustomer);
-            this.processedOrderIds.add(orderId);
-            this.orderStatusMap.set(orderId, digitalOrder.status);
-            this.orderPaymentStatusMap.set(orderId, digitalOrder.paymentStatus || 'pending');
             synced++;
             console.log(`✅ Synced digital menu order ${orderId} for ${customerDoc.customerName}`);
             
@@ -148,6 +150,10 @@ export class DigitalMenuSyncService {
             }
           } catch (error) {
             console.error(`❌ Failed to sync order ${orderId}:`, error);
+            // Remove from processedOrderIds so it can be retried in next sync cycle
+            this.processedOrderIds.delete(orderId);
+            this.orderStatusMap.delete(orderId);
+            this.orderPaymentStatusMap.delete(orderId);
           }
         }
       }
