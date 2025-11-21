@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Plus, Edit, Trash2, Eye, MoreVertical, Database, RefreshCw, ArrowUpDown, Search, Filter } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Edit, Trash2, Eye, MoreVertical, Database, RefreshCw, ArrowUpDown, Search, Filter, X } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import AppHeader from "@/components/AppHeader";
 import CategorySidebar from "@/components/CategorySidebar";
@@ -29,13 +29,21 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { MenuItem } from "@shared/schema";
+import type { MenuItem, InventoryItem } from "@shared/schema";
 
 type SortOption = "name-asc" | "name-desc" | "price-asc" | "price-desc" | "category-asc" | "category-desc" | "cost-asc" | "cost-desc" | "type-veg" | "type-nonveg";
 type AvailabilityFilter = "all" | "available" | "unavailable";
 type TypeFilter = "all" | "veg" | "nonveg";
+
+interface RecipeIngredient {
+  id?: string;
+  inventoryItemId: string;
+  quantity: string;
+  unit: string;
+}
 
 export default function MenuPage() {
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -50,6 +58,8 @@ export default function MenuPage() {
   const [isImageViewerOpen, setIsImageViewerOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [ingredients, setIngredients] = useState<RecipeIngredient[]>([]);
+  const [isLoadingRecipe, setIsLoadingRecipe] = useState(false);
   const { toast } = useToast();
 
   const { data: items = [], isLoading } = useQuery<MenuItem[]>({
@@ -62,6 +72,10 @@ export default function MenuPage() {
 
   const { data: categoriesData } = useQuery<{ categories: string[] }>({
     queryKey: ["/api/menu/categories"],
+  });
+
+  const { data: inventoryItems = [] } = useQuery<InventoryItem[]>({
+    queryKey: ["/api/inventory"],
   });
 
   const saveMongoURIMutation = useMutation({
@@ -200,7 +214,7 @@ export default function MenuPage() {
     const formData = new FormData(e.currentTarget);
     
     try {
-      await createMenuItemMutation.mutateAsync({
+      const newItem = await createMenuItemMutation.mutateAsync({
         name: formData.get("name") as string,
         category: formData.get("category") as string,
         price: formData.get("price") as string,
@@ -210,6 +224,25 @@ export default function MenuPage() {
         image: formData.get("image") as string || null,
         description: formData.get("description") as string || null,
         quickCode: formData.get("quickCode") as string || null,
+      });
+
+      if (ingredients.length > 0) {
+        const recipeRes = await apiRequest("POST", "/api/recipes", { menuItemId: newItem.id });
+        const recipe = await recipeRes.json();
+
+        for (const ingredient of ingredients) {
+          await apiRequest("POST", `/api/recipes/${recipe.id}/ingredients`, {
+            inventoryItemId: ingredient.inventoryItemId,
+            quantity: ingredient.quantity,
+            unit: ingredient.unit,
+          });
+        }
+      }
+
+      setIngredients([]);
+      toast({
+        title: "Success",
+        description: "Menu item and recipe added successfully",
       });
     } catch (error: any) {
       toast({
@@ -239,6 +272,42 @@ export default function MenuPage() {
           description: formData.get("description") as string || null,
           quickCode: formData.get("quickCode") as string || null,
         },
+      });
+
+      try {
+        const recipeRes = await apiRequest("GET", `/api/recipes/menu-item/${editingItem.id}`);
+        const existingRecipe = await recipeRes.json();
+
+        for (const ingredient of existingRecipe.ingredients) {
+          await apiRequest("DELETE", `/api/recipes/${existingRecipe.recipe.id}/ingredients/${ingredient.id}`);
+        }
+
+        for (const ingredient of ingredients) {
+          await apiRequest("POST", `/api/recipes/${existingRecipe.recipe.id}/ingredients`, {
+            inventoryItemId: ingredient.inventoryItemId,
+            quantity: ingredient.quantity,
+            unit: ingredient.unit,
+          });
+        }
+      } catch (recipeError: any) {
+        if (ingredients.length > 0) {
+          const recipeRes = await apiRequest("POST", "/api/recipes", { menuItemId: editingItem.id });
+          const recipe = await recipeRes.json();
+
+          for (const ingredient of ingredients) {
+            await apiRequest("POST", `/api/recipes/${recipe.id}/ingredients`, {
+              inventoryItemId: ingredient.inventoryItemId,
+              quantity: ingredient.quantity,
+              unit: ingredient.unit,
+            });
+          }
+        }
+      }
+
+      setIngredients([]);
+      toast({
+        title: "Success",
+        description: "Menu item and recipe updated successfully",
       });
     } catch (error: any) {
       toast({
@@ -271,9 +340,30 @@ export default function MenuPage() {
     });
   };
 
-  const openEditDialog = (item: MenuItem) => {
+  const openEditDialog = async (item: MenuItem) => {
     setEditingItem(item);
     setIsEditDialogOpen(true);
+    setIngredients([]);
+    
+    setIsLoadingRecipe(true);
+    try {
+      const recipeRes = await apiRequest("GET", `/api/recipes/menu-item/${item.id}`);
+      const recipeData = await recipeRes.json();
+      
+      if (recipeData && recipeData.ingredients) {
+        const loadedIngredients: RecipeIngredient[] = recipeData.ingredients.map((ing: any) => ({
+          id: ing.id,
+          inventoryItemId: ing.inventoryItemId,
+          quantity: ing.quantity,
+          unit: ing.unit,
+        }));
+        setIngredients(loadedIngredients);
+      }
+    } catch (error) {
+      console.log("No recipe found for this item");
+    } finally {
+      setIsLoadingRecipe(false);
+    }
   };
 
   const openImageViewer = (image: string | null) => {
@@ -281,6 +371,39 @@ export default function MenuPage() {
       setSelectedImage(image);
       setIsImageViewerOpen(true);
     }
+  };
+
+  const addIngredient = () => {
+    setIngredients([...ingredients, { inventoryItemId: "", quantity: "1", unit: "" }]);
+  };
+
+  const removeIngredient = (index: number) => {
+    setIngredients(ingredients.filter((_, i) => i !== index));
+  };
+
+  const updateIngredient = (index: number, field: keyof RecipeIngredient, value: string) => {
+    const updated = [...ingredients];
+    updated[index] = { ...updated[index], [field]: value };
+    
+    if (field === "inventoryItemId") {
+      const selectedItem = inventoryItems.find(item => item.id === value);
+      if (selectedItem) {
+        updated[index].unit = selectedItem.unit;
+      }
+    }
+    
+    setIngredients(updated);
+  };
+
+  const resetAddDialog = () => {
+    setIsAddDialogOpen(false);
+    setIngredients([]);
+  };
+
+  const resetEditDialog = () => {
+    setIsEditDialogOpen(false);
+    setEditingItem(null);
+    setIngredients([]);
   };
 
   return (
@@ -401,18 +524,19 @@ export default function MenuPage() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <Dialog open={isAddDialogOpen} onOpenChange={resetAddDialog}>
               <DialogTrigger asChild>
                 <Button size="sm" data-testid="button-add-item">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Item
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-2xl max-h-[90vh]">
                 <DialogHeader>
                   <DialogTitle>Add New Menu Item</DialogTitle>
                 </DialogHeader>
-                <form onSubmit={handleAddSubmit} className="space-y-4 mt-4">
+                <ScrollArea className="max-h-[calc(90vh-100px)]">
+                <form onSubmit={handleAddSubmit} className="space-y-4 mt-4 pr-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">Item Name</Label>
                     <Input 
@@ -504,6 +628,79 @@ export default function MenuPage() {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  <div className="border-t pt-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Ingredients (Optional)</Label>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={addIngredient}
+                        data-testid="button-add-ingredient"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Ingredient
+                      </Button>
+                    </div>
+
+                    {ingredients.length > 0 && (
+                      <div className="space-y-2">
+                        {ingredients.map((ingredient, index) => (
+                          <div key={index} className="flex items-end gap-2 p-3 bg-muted/30 rounded-lg" data-testid={`ingredient-row-${index}`}>
+                            <div className="flex-1 space-y-1">
+                              <Label className="text-xs">Ingredient</Label>
+                              <Select
+                                value={ingredient.inventoryItemId}
+                                onValueChange={(value) => updateIngredient(index, "inventoryItemId", value)}
+                              >
+                                <SelectTrigger data-testid={`select-ingredient-${index}`}>
+                                  <SelectValue placeholder="Select ingredient" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {inventoryItems.map((item) => (
+                                    <SelectItem key={item.id} value={item.id}>
+                                      {item.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="w-24 space-y-1">
+                              <Label className="text-xs">Quantity</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                min="0.01"
+                                value={ingredient.quantity}
+                                onChange={(e) => updateIngredient(index, "quantity", e.target.value)}
+                                data-testid={`input-quantity-${index}`}
+                              />
+                            </div>
+                            <div className="w-20 space-y-1">
+                              <Label className="text-xs">Unit</Label>
+                              <Input
+                                value={ingredient.unit}
+                                readOnly
+                                className="bg-muted"
+                                data-testid={`input-unit-${index}`}
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => removeIngredient(index)}
+                              data-testid={`button-remove-ingredient-${index}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   <Button 
                     type="submit"
                     className="w-full"
@@ -513,6 +710,7 @@ export default function MenuPage() {
                     {createMenuItemMutation.isPending ? "Adding..." : "Add Item"}
                   </Button>
                 </form>
+                </ScrollArea>
               </DialogContent>
             </Dialog>
 
@@ -781,125 +979,200 @@ export default function MenuPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
-        setIsEditDialogOpen(open);
-        if (!open) setEditingItem(null);
-      }}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={isEditDialogOpen} onOpenChange={resetEditDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>Edit Menu Item</DialogTitle>
           </DialogHeader>
           {editingItem && (
-            <form onSubmit={handleEditSubmit} className="mt-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-name">Item Name</Label>
-                  <Input 
-                    id="edit-name"
-                    name="name"
-                    placeholder="Item Name"
-                    defaultValue={editingItem.name}
-                    required
-                    data-testid="input-edit-name" 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-category">Category</Label>
-                  <Select name="category" defaultValue={editingItem.category} required>
-                    <SelectTrigger data-testid="select-edit-category">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.filter(c => c !== "All").map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-price">Price</Label>
-                  <Input 
-                    id="edit-price"
-                    name="price"
-                    type="number"
-                    step="0.01"
-                    placeholder="Price"
-                    defaultValue={editingItem.price}
-                    required
-                    data-testid="input-edit-price" 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-cost">Cost</Label>
-                  <Input 
-                    id="edit-cost"
-                    name="cost"
-                    type="number"
-                    step="0.01"
-                    placeholder="Cost"
-                    defaultValue={editingItem.cost}
-                    required
-                    data-testid="input-edit-cost" 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-quickCode">Quick Code (Optional)</Label>
-                  <Input 
-                    id="edit-quickCode"
-                    name="quickCode"
-                    placeholder="e.g., 1, A1, or custom code"
-                    defaultValue={editingItem.quickCode || ""}
-                    data-testid="input-edit-quickcode"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Unique code for quick entry in POS. Each item must have a different code.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-isVeg">Vegetarian</Label>
-                  <Select name="isVeg" defaultValue={editingItem.isVeg ? "true" : "false"}>
-                    <SelectTrigger data-testid="select-edit-isVeg">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="true">Vegetarian</SelectItem>
-                      <SelectItem value="false">Non-Vegetarian</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="edit-image">Image URL</Label>
-                  <Input 
-                    id="edit-image"
-                    name="image"
-                    placeholder="https://example.com/image.jpg"
-                    defaultValue={editingItem.image || ""}
-                    data-testid="input-edit-image" 
-                  />
-                </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="edit-description">Description</Label>
-                  <Textarea 
-                    id="edit-description"
-                    name="description"
-                    placeholder="Item description"
-                    defaultValue={editingItem.description || ""}
-                    className="min-h-[80px]"
-                    data-testid="input-edit-description" 
-                  />
-                </div>
+            <ScrollArea className="max-h-[calc(90vh-100px)]">
+            <form onSubmit={handleEditSubmit} className="space-y-4 mt-4 pr-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">Item Name</Label>
+                <Input 
+                  id="edit-name"
+                  name="name"
+                  placeholder="Item Name"
+                  defaultValue={editingItem.name}
+                  required
+                  data-testid="input-edit-name" 
+                />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-category">Category</Label>
+                <Select name="category" defaultValue={editingItem.category} required>
+                  <SelectTrigger data-testid="select-edit-category">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.filter(c => c !== "All").map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-price">Price</Label>
+                <Input 
+                  id="edit-price"
+                  name="price"
+                  type="number"
+                  step="0.01"
+                  placeholder="Price"
+                  defaultValue={editingItem.price}
+                  required
+                  data-testid="input-edit-price" 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-cost">Cost</Label>
+                <Input 
+                  id="edit-cost"
+                  name="cost"
+                  type="number"
+                  step="0.01"
+                  placeholder="Cost"
+                  defaultValue={editingItem.cost}
+                  required
+                  data-testid="input-edit-cost" 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-image">Image URL</Label>
+                <Input 
+                  id="edit-image"
+                  name="image"
+                  placeholder="https://example.com/image.jpg"
+                  defaultValue={editingItem.image || ""}
+                  data-testid="input-edit-image" 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-description">Description</Label>
+                <Textarea 
+                  id="edit-description"
+                  name="description"
+                  placeholder="Item description"
+                  defaultValue={editingItem.description || ""}
+                  data-testid="input-edit-description" 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-quickCode">Quick Code (Optional)</Label>
+                <Input 
+                  id="edit-quickCode"
+                  name="quickCode"
+                  placeholder="e.g., 1, A1, or custom code"
+                  defaultValue={editingItem.quickCode || ""}
+                  data-testid="input-edit-quickcode"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Unique code for quick entry in POS. Each item must have a different code.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-isVeg">Vegetarian</Label>
+                <Select name="isVeg" defaultValue={editingItem.isVeg ? "true" : "false"}>
+                  <SelectTrigger data-testid="select-edit-isVeg">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Vegetarian</SelectItem>
+                    <SelectItem value="false">Non-Vegetarian</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="border-t pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Ingredients (Optional)</Label>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={addIngredient}
+                    data-testid="button-add-ingredient-edit"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Ingredient
+                  </Button>
+                </div>
+
+                {isLoadingRecipe && (
+                  <div className="text-sm text-muted-foreground py-2">
+                    Loading recipe ingredients...
+                  </div>
+                )}
+
+                {!isLoadingRecipe && ingredients.length > 0 && (
+                  <div className="space-y-2">
+                    {ingredients.map((ingredient, index) => (
+                      <div key={index} className="flex items-end gap-2 p-3 bg-muted/30 rounded-lg" data-testid={`ingredient-row-edit-${index}`}>
+                        <div className="flex-1 space-y-1">
+                          <Label className="text-xs">Ingredient</Label>
+                          <Select
+                            value={ingredient.inventoryItemId}
+                            onValueChange={(value) => updateIngredient(index, "inventoryItemId", value)}
+                          >
+                            <SelectTrigger data-testid={`select-ingredient-edit-${index}`}>
+                              <SelectValue placeholder="Select ingredient" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {inventoryItems.map((item) => (
+                                <SelectItem key={item.id} value={item.id}>
+                                  {item.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="w-24 space-y-1">
+                          <Label className="text-xs">Quantity</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            value={ingredient.quantity}
+                            onChange={(e) => updateIngredient(index, "quantity", e.target.value)}
+                            data-testid={`input-quantity-edit-${index}`}
+                          />
+                        </div>
+                        <div className="w-20 space-y-1">
+                          <Label className="text-xs">Unit</Label>
+                          <Input
+                            value={ingredient.unit}
+                            readOnly
+                            className="bg-muted"
+                            data-testid={`input-unit-edit-${index}`}
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => removeIngredient(index)}
+                          data-testid={`button-remove-ingredient-edit-${index}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <Button 
                 type="submit"
-                className="w-full mt-6"
+                className="w-full"
                 disabled={updateMenuItemMutation.isPending}
                 data-testid="button-update-item"
               >
                 {updateMenuItemMutation.isPending ? "Updating..." : "Update Item"}
               </Button>
             </form>
+            </ScrollArea>
           )}
         </DialogContent>
       </Dialog>

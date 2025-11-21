@@ -1,192 +1,365 @@
-import { Trash2, TrendingDown, AlertTriangle, Package, DollarSign } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, Trash2 } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { format } from "date-fns";
 import AppHeader from "@/components/AppHeader";
-import StatCard from "@/components/StatCard";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { Wastage, InventoryItem } from "@shared/schema";
 
-const wastageByCategory = [
-  { name: "Vegetables", value: 25 },
-  { name: "Dairy", value: 15 },
-  { name: "Meat", value: 20 },
-  { name: "Prepared Food", value: 30 },
-  { name: "Others", value: 10 },
-];
+const wastageFormSchema = z.object({
+  inventoryItemId: z.string().min(1, "Inventory item is required"),
+  quantity: z.string().min(1, "Quantity is required"),
+  reason: z.string().min(1, "Reason is required"),
+  reportedBy: z.string().optional(),
+  notes: z.string().optional(),
+});
 
-const COLORS = ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6'];
+type WastageFormData = z.infer<typeof wastageFormSchema>;
 
-const dailyWastageData = [
-  { day: "Mon", quantity: 4.5, cost: 1200 },
-  { day: "Tue", quantity: 3.2, cost: 900 },
-  { day: "Wed", quantity: 5.1, cost: 1450 },
-  { day: "Thu", quantity: 3.8, cost: 1050 },
-  { day: "Fri", quantity: 6.2, cost: 1800 },
-  { day: "Sat", quantity: 5.5, cost: 1600 },
-  { day: "Sun", quantity: 4.9, cost: 1350 },
-];
+interface ExtendedWastage extends Wastage {
+  inventoryItem?: InventoryItem;
+}
 
 export default function WastagePage() {
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const { toast } = useToast();
+
+  const { data: wastages = [], isLoading } = useQuery<ExtendedWastage[]>({
+    queryKey: ["/api/wastage"],
+  });
+
+  const { data: inventoryItems = [] } = useQuery<InventoryItem[]>({
+    queryKey: ["/api/inventory"],
+  });
+
+  // WebSocket integration
+  useEffect(() => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${protocol}//${window.location.host}/api/ws`);
+    
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'wastage_created' || data.type === 'wastage_deleted') {
+        queryClient.invalidateQueries({ queryKey: ["/api/wastage"] });
+      }
+      if (data.type === 'inventory_updated') {
+        queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      }
+    };
+    
+    return () => ws.close();
+  }, []);
+
+  const form = useForm<WastageFormData>({
+    resolver: zodResolver(wastageFormSchema),
+    defaultValues: {
+      inventoryItemId: "",
+      quantity: "",
+      reason: "",
+      reportedBy: "",
+      notes: "",
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: WastageFormData) => {
+      const res = await apiRequest("POST", "/api/wastage", data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/wastage"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      setIsAddDialogOpen(false);
+      form.reset();
+      toast({
+        title: "Success",
+        description: "Wastage recorded and inventory updated",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to record wastage",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/wastage/${id}`);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/wastage"] });
+      toast({
+        title: "Success",
+        description: "Wastage record deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete wastage record",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (data: WastageFormData) => {
+    createMutation.mutate(data);
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm("Are you sure you want to delete this wastage record?")) {
+      deleteMutation.mutate(id);
+    }
+  };
+
+  // Watch for inventory item selection to auto-fill unit
+  const selectedItemId = form.watch("inventoryItemId");
+  const selectedItem = inventoryItems.find(item => item.id === selectedItemId);
+
   return (
     <div className="h-screen flex flex-col">
-      <AppHeader title="Wastage Management" showSearch={false} />
+      <AppHeader title="Wastage Tracking" />
+
+      <div className="p-6 border-b border-border bg-card/30">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Total Wastage Records:</span>
+            <span className="font-semibold" data-testid="text-total-wastages">{wastages.length}</span>
+          </div>
+          <Button
+            onClick={() => {
+              form.reset();
+              setIsAddDialogOpen(true);
+            }}
+            data-testid="button-add-wastage"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Wastage
+          </Button>
+        </div>
+      </div>
 
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          <StatCard
-            title="Total Wastage (Week)"
-            value="33.2 kg"
-            icon={Trash2}
-            color="red"
-            trend={{ value: 12.5, isPositive: false }}
-          />
-          <StatCard
-            title="Wastage Cost"
-            value="₹9,350"
-            icon={DollarSign}
-            color="red"
-            trend={{ value: 8.2, isPositive: false }}
-          />
-          <StatCard
-            title="Wastage Rate"
-            value="4.2%"
-            icon={TrendingDown}
-            color="yellow"
-            trend={{ value: 3.1, isPositive: false }}
-          />
-          <StatCard
-            title="Items at Risk"
-            value={14}
-            icon={AlertTriangle}
-            color="blue"
-            trend={{ value: 5.4, isPositive: true }}
-          />
-        </div>
-
-        <div className="grid grid-cols-3 gap-6 mb-6">
-          <Card className="col-span-2 p-6">
-            <h3 className="font-semibold text-lg mb-4">Daily Wastage Trend</h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={dailyWastageData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="day" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="quantity" fill="hsl(0 84% 60%)" />
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
-
-          <Card className="p-6">
-            <h3 className="font-semibold text-lg mb-4">Wastage by Category</h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie
-                  data={wastageByCategory}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {wastageByCategory.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </Card>
-        </div>
-
-        <Card className="p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-lg">Wastage Records</h3>
-            <Button size="sm">
-              <Trash2 className="h-4 w-4 mr-2" />
-              Add Wastage Entry
-            </Button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Date</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Item</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Category</th>
-                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Quantity</th>
-                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Cost</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Reason</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Recorded By</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { date: "2024-01-15", item: "Tomatoes", category: "Vegetables", quantity: "2.5 kg", cost: 250, reason: "Expired", recordedBy: "Kitchen Manager" },
-                  { date: "2024-01-15", item: "Chicken Breast", category: "Meat", quantity: "1.2 kg", cost: 480, reason: "Spoiled", recordedBy: "Chef" },
-                  { date: "2024-01-14", item: "Pizza Dough", category: "Prepared Food", quantity: "3 units", cost: 150, reason: "Over-prepared", recordedBy: "Kitchen Manager" },
-                  { date: "2024-01-14", item: "Lettuce", category: "Vegetables", quantity: "1.5 kg", cost: 120, reason: "Wilted", recordedBy: "Prep Cook" },
-                  { date: "2024-01-13", item: "Milk", category: "Dairy", quantity: "2 L", cost: 100, reason: "Expired", recordedBy: "Kitchen Manager" },
-                ].map((item, index) => (
-                  <tr key={index} className="border-b border-border last:border-0 hover-elevate">
-                    <td className="py-3 px-4">{item.date}</td>
-                    <td className="py-3 px-4 font-medium">{item.item}</td>
-                    <td className="py-3 px-4">
-                      <Badge variant="outline">{item.category}</Badge>
-                    </td>
-                    <td className="py-3 px-4 text-right">{item.quantity}</td>
-                    <td className="py-3 px-4 text-right text-red-600 font-semibold">₹{item.cost}</td>
-                    <td className="py-3 px-4">
-                      <Badge variant="secondary">{item.reason}</Badge>
-                    </td>
-                    <td className="py-3 px-4 text-muted-foreground">{item.recordedBy}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-
-        <Card className="p-6">
-          <h3 className="font-semibold text-lg mb-4">Items Nearing Expiry</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Item Name</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Category</th>
-                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Quantity</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Expiry Date</th>
-                  <th className="text-left py-3 px-4 font-medium text-muted-foreground">Days Left</th>
-                  <th className="text-right py-3 px-4 font-medium text-muted-foreground">Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { name: "Fresh Cream", category: "Dairy", quantity: "5 L", expiry: "2024-01-17", days: 2, value: 750 },
-                  { name: "Bell Peppers", category: "Vegetables", quantity: "3 kg", expiry: "2024-01-18", days: 3, value: 420 },
-                  { name: "Chicken Stock", category: "Prepared Food", quantity: "8 L", expiry: "2024-01-19", days: 4, value: 960 },
-                ].map((item, index) => (
-                  <tr key={index} className="border-b border-border last:border-0 hover-elevate">
-                    <td className="py-3 px-4 font-medium">{item.name}</td>
-                    <td className="py-3 px-4">
-                      <Badge variant="outline">{item.category}</Badge>
-                    </td>
-                    <td className="py-3 px-4 text-right">{item.quantity}</td>
-                    <td className="py-3 px-4">{item.expiry}</td>
-                    <td className="py-3 px-4">
-                      <Badge variant="destructive">{item.days} days</Badge>
-                    </td>
-                    <td className="py-3 px-4 text-right font-semibold">₹{item.value}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+        {isLoading ? (
+          <div className="text-center py-8">Loading...</div>
+        ) : wastages.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">No wastage records found</div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Item</TableHead>
+                <TableHead className="text-right">Quantity</TableHead>
+                <TableHead>Unit</TableHead>
+                <TableHead>Reason</TableHead>
+                <TableHead>Recorded By</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {wastages.map((wastage) => (
+                <TableRow key={wastage.id} data-testid={`row-wastage-${wastage.id}`}>
+                  <TableCell>{format(new Date(wastage.createdAt), "MMM dd, yyyy")}</TableCell>
+                  <TableCell className="font-medium">{wastage.inventoryItem?.name || "-"}</TableCell>
+                  <TableCell className="text-right">{wastage.quantity}</TableCell>
+                  <TableCell>{wastage.unit}</TableCell>
+                  <TableCell>{wastage.reason}</TableCell>
+                  <TableCell>{wastage.reportedBy || "-"}</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDelete(wastage.id)}
+                      data-testid={`button-delete-${wastage.id}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </div>
+
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Wastage Record</DialogTitle>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="inventoryItemId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Inventory Item</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-inventory-item">
+                          <SelectValue placeholder="Select item" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {inventoryItems.map(item => (
+                          <SelectItem key={item.id} value={item.id}>
+                            {item.name} ({item.currentStock} {item.unit} available)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="quantity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Quantity</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type="number"
+                          step="0.01"
+                          placeholder="0"
+                          data-testid="input-quantity"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div>
+                  <FormLabel>Unit</FormLabel>
+                  <Input
+                    value={selectedItem?.unit || "-"}
+                    disabled
+                    className="bg-muted"
+                    data-testid="input-unit"
+                  />
+                </div>
+              </div>
+
+              <FormField
+                control={form.control}
+                name="reason"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reason</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        placeholder="Expired, spoiled, damaged, etc."
+                        rows={3}
+                        data-testid="input-reason"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="reportedBy"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Reported By (Optional)</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Staff name" data-testid="input-reported-by" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        {...field}
+                        placeholder="Additional notes"
+                        rows={2}
+                        data-testid="input-notes"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAddDialogOpen(false)}
+                  data-testid="button-cancel"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createMutation.isPending}
+                  data-testid="button-submit"
+                >
+                  {createMutation.isPending ? "Recording..." : "Record Wastage"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
