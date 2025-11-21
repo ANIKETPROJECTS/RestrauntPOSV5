@@ -1195,11 +1195,11 @@ export default function MenuPage() {
             <DialogTitle>Item Image</DialogTitle>
           </DialogHeader>
           {selectedImage && (
-            <div className="mt-4">
+            <div className="mt-4 flex items-center justify-center bg-muted rounded-lg overflow-hidden" style={{ maxHeight: '500px' }}>
               <img 
                 src={selectedImage} 
                 alt="Menu item" 
-                className="w-full h-auto rounded-lg"
+                className="w-full h-full object-contain rounded-lg"
                 onError={(e) => {
                   e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23ddd' width='400' height='300'/%3E%3Ctext fill='%23666' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3EImage not available%3C/text%3E%3C/svg%3E";
                 }}
