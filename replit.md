@@ -103,6 +103,16 @@ Preferred communication style: Simple, everyday language.
 
 ### Recent Changes (November 2025)
 
+**Recipe Ingredients System - FULLY FIXED** (November 21, 2025):
+- Fixed critical bug where recipes were created with 0 ingredients
+- Root cause: Database contained stale recipes from previous seeding attempts; API returned old recipes instead of new ones
+- Solution implemented:
+  1. Modified `getRecipeByMenuItemId()` to sort by `createdAt` descending (returns latest recipe)
+  2. Added automatic cleanup in seeding endpoint to delete old recipes before creating new ones
+- Result: All 5 Thai recipes now correctly show 6-9 ingredients each
+- All 11 Thai ingredients confirmed in inventory: Paneer, Thai Basil, Red Chili, Garlic, Ginger, Lemongrass, Lime, Fish Sauce, Green Chili, Coconut Milk, Prawns
+- Recipe system ready for production use with automatic inventory deduction on order checkout
+
 **Complete MongoDB Migration** (November 6, 2025):
 - Migrated entire project from in-memory storage to MongoDB for persistent data storage
 - Removed PostgreSQL/Drizzle ORM dependencies (deleted server/db.ts, drizzle.config.ts)
