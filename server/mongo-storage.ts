@@ -999,4 +999,145 @@ export class MongoStorage implements IStorage {
       { upsert: true }
     );
   }
+
+  async seedInventoryAndRecipes(): Promise<{ inventoryCount: number; recipesCount: number; suppliersCount: number }> {
+    await this.ensureConnection();
+    
+    // Check if already seeded
+    const existingInventory = await this.getInventoryItems();
+    if (existingInventory.length > 0) {
+      return { inventoryCount: existingInventory.length, recipesCount: 0, suppliersCount: 0 };
+    }
+
+    // Create suppliers
+    const supplier1 = await this.createSupplier({
+      name: "Fresh Foods Inc.",
+      contactPerson: "John Smith",
+      phone: "+1-555-0101",
+      email: "john@freshfoods.com",
+      address: "123 Market Street, City, State 12345",
+      status: "active",
+    });
+
+    const supplier2 = await this.createSupplier({
+      name: "Quality Ingredients Co.",
+      contactPerson: "Sarah Johnson",
+      phone: "+1-555-0202",
+      email: "sarah@qualityingredients.com",
+      address: "456 Supply Lane, City, State 12345",
+      status: "active",
+    });
+
+    // Create inventory items
+    const inventoryItemsData = [
+      { name: "Chicken Breast", category: "Meat & Poultry", currentStock: "50000", unit: "g", minStock: "10000", costPerUnit: "0.015", supplierId: supplier1.id },
+      { name: "Baby Corn", category: "Vegetables", currentStock: "20000", unit: "g", minStock: "5000", costPerUnit: "0.008", supplierId: supplier1.id },
+      { name: "Cooking Oil", category: "Cooking Essentials", currentStock: "10000", unit: "ml", minStock: "2000", costPerUnit: "0.005", supplierId: supplier2.id },
+      { name: "Soy Sauce", category: "Condiments", currentStock: "5000", unit: "ml", minStock: "1000", costPerUnit: "0.010", supplierId: supplier2.id },
+      { name: "Spices Mix", category: "Spices", currentStock: "5000", unit: "g", minStock: "1000", costPerUnit: "0.020", supplierId: supplier2.id },
+      { name: "Wheat Flour", category: "Baking", currentStock: "30000", unit: "g", minStock: "5000", costPerUnit: "0.003", supplierId: supplier2.id },
+      { name: "Cheese", category: "Dairy", currentStock: "15000", unit: "g", minStock: "3000", costPerUnit: "0.012", supplierId: supplier1.id },
+      { name: "Mixed Vegetables", category: "Vegetables", currentStock: "25000", unit: "g", minStock: "5000", costPerUnit: "0.006", supplierId: supplier1.id },
+      { name: "Burger Buns", category: "Bakery", currentStock: "200", unit: "pcs", minStock: "50", costPerUnit: "0.50", supplierId: supplier1.id },
+      { name: "Pizza Dough", category: "Bakery", currentStock: "100", unit: "pcs", minStock: "20", costPerUnit: "1.20", supplierId: supplier1.id },
+      { name: "Tomato Sauce", category: "Condiments", currentStock: "8000", unit: "ml", minStock: "2000", costPerUnit: "0.008", supplierId: supplier2.id },
+      { name: "Potatoes", category: "Vegetables", currentStock: "40000", unit: "g", minStock: "10000", costPerUnit: "0.002", supplierId: supplier1.id },
+      { name: "Lettuce", category: "Vegetables", currentStock: "3000", unit: "g", minStock: "500", costPerUnit: "0.015", supplierId: supplier1.id },
+      { name: "Pasta", category: "Pasta & Grains", currentStock: "20000", unit: "g", minStock: "5000", costPerUnit: "0.004", supplierId: supplier2.id },
+      { name: "Cream", category: "Dairy", currentStock: "8000", unit: "ml", minStock: "2000", costPerUnit: "0.012", supplierId: supplier1.id },
+      { name: "Chocolate", category: "Desserts", currentStock: "5000", unit: "g", minStock: "1000", costPerUnit: "0.025", supplierId: supplier2.id },
+      { name: "Vanilla Extract", category: "Flavorings", currentStock: "2000", unit: "ml", minStock: "500", costPerUnit: "0.030", supplierId: supplier2.id },
+      { name: "Strawberries", category: "Fruits", currentStock: "3000", unit: "g", minStock: "1000", costPerUnit: "0.020", supplierId: supplier1.id },
+      { name: "Coca Cola Syrup", category: "Beverages", currentStock: "10000", unit: "ml", minStock: "2000", costPerUnit: "0.008", supplierId: supplier2.id },
+    ];
+
+    const inventoryItems: InventoryItem[] = [];
+    for (const itemData of inventoryItemsData) {
+      const item = await this.createInventoryItem(itemData);
+      inventoryItems.push(item);
+    }
+
+    // Create a map of inventory items by name for easy lookup
+    const inventoryMap = new Map(inventoryItems.map(item => [item.name, item]));
+
+    // Get all menu items
+    const menuItems = await this.getMenuItems();
+    let recipesCreated = 0;
+
+    // Create recipes for existing menu items
+    const recipeData: { [key: string]: { ingredients: string[]; quantities: string[]; units: string[] } } = {
+      "Chicken Burger": {
+        ingredients: ["Chicken Breast", "Burger Buns", "Lettuce"],
+        quantities: ["150", "1", "30"],
+        units: ["g", "pcs", "g"]
+      },
+      "Veggie Pizza": {
+        ingredients: ["Pizza Dough", "Cheese", "Mixed Vegetables", "Tomato Sauce"],
+        quantities: ["1", "200", "150", "100"],
+        units: ["pcs", "g", "g", "ml"]
+      },
+      "French Fries": {
+        ingredients: ["Potatoes", "Cooking Oil"],
+        quantities: ["300", "50"],
+        units: ["g", "ml"]
+      },
+      "Coca Cola": {
+        ingredients: ["Coca Cola Syrup"],
+        quantities: ["30"],
+        units: ["ml"]
+      },
+      "Caesar Salad": {
+        ingredients: ["Lettuce", "Cheese", "Chicken Breast"],
+        quantities: ["100", "50", "80"],
+        units: ["g", "g", "g"]
+      },
+      "Pasta Alfredo": {
+        ingredients: ["Pasta", "Cream", "Cheese"],
+        quantities: ["200", "150", "80"],
+        units: ["g", "ml", "g"]
+      },
+      "Chocolate Cake": {
+        ingredients: ["Wheat Flour", "Chocolate", "Cream"],
+        quantities: ["150", "100", "50"],
+        units: ["g", "g", "ml"]
+      },
+      "Ice Cream": {
+        ingredients: ["Cream", "Vanilla Extract", "Strawberries"],
+        quantities: ["150", "10", "50"],
+        units: ["ml", "ml", "g"]
+      },
+    };
+
+    for (const menuItem of menuItems) {
+      const recipeInfo = recipeData[menuItem.name];
+      if (!recipeInfo) continue;
+
+      // Create recipe
+      const recipe = await this.createRecipe({
+        menuItemId: menuItem.id,
+      });
+
+      // Add ingredients to recipe
+      for (let i = 0; i < recipeInfo.ingredients.length; i++) {
+        const ingredientName = recipeInfo.ingredients[i];
+        const inventoryItem = inventoryMap.get(ingredientName);
+        if (!inventoryItem) continue;
+
+        await this.createRecipeIngredient({
+          recipeId: recipe.id,
+          inventoryItemId: inventoryItem.id,
+          quantity: recipeInfo.quantities[i],
+          unit: recipeInfo.units[i],
+        });
+      }
+
+      recipesCreated++;
+    }
+
+    return {
+      inventoryCount: inventoryItems.length,
+      recipesCount: recipesCreated,
+      suppliersCount: 2,
+    };
+  }
 }

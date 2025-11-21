@@ -9,6 +9,12 @@ import {
   insertOrderSchema,
   insertOrderItemSchema,
   insertInventoryItemSchema,
+  insertRecipeSchema,
+  insertRecipeIngredientSchema,
+  insertSupplierSchema,
+  insertPurchaseOrderSchema,
+  insertPurchaseOrderItemSchema,
+  insertWastageSchema,
   insertInvoiceSchema,
   insertReservationSchema,
   insertCustomerSchema,
@@ -599,6 +605,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       notes: null,
     });
 
+    // Auto-deduct inventory for order
+    try {
+      await storage.deductInventoryForOrder(checkedOutOrder.id);
+      broadcastUpdate("inventory_updated", { orderId: checkedOutOrder.id });
+    } catch (error) {
+      console.error("Error deducting inventory for order:", error);
+    }
+
     broadcastUpdate("order_paid", checkedOutOrder);
     broadcastUpdate("invoice_created", invoice);
     res.json({ order: checkedOutOrder, invoice, shouldPrint: result.data.print });
@@ -1120,6 +1134,460 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+
+  // ==================== INVENTORY MANAGEMENT API ROUTES ====================
+
+  // Inventory Items
+  app.get("/api/inventory", async (req, res) => {
+    try {
+      let items = await storage.getInventoryItems();
+      
+      // Apply search filter
+      if (req.query.search) {
+        const search = req.query.search.toString().toLowerCase();
+        items = items.filter(item => 
+          item.name.toLowerCase().includes(search) ||
+          item.category.toLowerCase().includes(search)
+        );
+      }
+      
+      // Apply category filter
+      if (req.query.category) {
+        const category = req.query.category.toString();
+        items = items.filter(item => item.category === category);
+      }
+      
+      // Apply sorting
+      if (req.query.sortBy) {
+        const sortBy = req.query.sortBy.toString();
+        if (sortBy === 'name') {
+          items.sort((a, b) => a.name.localeCompare(b.name));
+        } else if (sortBy === 'stock') {
+          items.sort((a, b) => parseFloat(a.currentStock) - parseFloat(b.currentStock));
+        } else if (sortBy === 'lowStock') {
+          items = items.filter(item => parseFloat(item.currentStock) <= parseFloat(item.minStock));
+        }
+      }
+      
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching inventory:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch inventory" });
+    }
+  });
+
+  app.get("/api/inventory/:id", async (req, res) => {
+    try {
+      const item = await storage.getInventoryItem(req.params.id);
+      if (!item) {
+        return res.status(404).json({ error: "Inventory item not found" });
+      }
+      res.json(item);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch inventory item" });
+    }
+  });
+
+  app.post("/api/inventory", async (req, res) => {
+    try {
+      const result = insertInventoryItemSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      const item = await storage.createInventoryItem(result.data);
+      broadcastUpdate("inventory_created", item);
+      res.json(item);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create inventory item" });
+    }
+  });
+
+  app.patch("/api/inventory/:id", async (req, res) => {
+    try {
+      const item = await storage.updateInventoryItem(req.params.id, req.body);
+      if (!item) {
+        return res.status(404).json({ error: "Inventory item not found" });
+      }
+      broadcastUpdate("inventory_updated", item);
+      res.json(item);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update inventory item" });
+    }
+  });
+
+  app.delete("/api/inventory/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteInventoryItem(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Inventory item not found" });
+      }
+      broadcastUpdate("inventory_deleted", { id: req.params.id });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete inventory item" });
+    }
+  });
+
+  // Recipes & Ingredients
+  app.get("/api/recipes/menu-item/:menuItemId", async (req, res) => {
+    try {
+      const recipe = await storage.getRecipeByMenuItemId(req.params.menuItemId);
+      if (!recipe) {
+        return res.status(404).json({ error: "Recipe not found for this menu item" });
+      }
+      
+      const ingredients = await storage.getRecipeIngredients(recipe.id);
+      const ingredientsWithDetails = await Promise.all(
+        ingredients.map(async (ingredient) => {
+          const inventoryItem = await storage.getInventoryItem(ingredient.inventoryItemId);
+          return {
+            ...ingredient,
+            inventoryItem,
+          };
+        })
+      );
+      
+      res.json({
+        recipe,
+        ingredients: ingredientsWithDetails,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch recipe" });
+    }
+  });
+
+  app.post("/api/recipes", async (req, res) => {
+    try {
+      const result = insertRecipeSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      const recipe = await storage.createRecipe(result.data);
+      broadcastUpdate("recipe_created", recipe);
+      res.json(recipe);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create recipe" });
+    }
+  });
+
+  app.post("/api/recipes/:recipeId/ingredients", async (req, res) => {
+    try {
+      const result = insertRecipeIngredientSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      const ingredient = await storage.createRecipeIngredient({
+        ...result.data,
+        recipeId: req.params.recipeId,
+      });
+      broadcastUpdate("recipe_ingredient_added", ingredient);
+      res.json(ingredient);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to add recipe ingredient" });
+    }
+  });
+
+  app.patch("/api/recipes/:recipeId/ingredients/:id", async (req, res) => {
+    try {
+      const ingredient = await storage.updateRecipeIngredient(req.params.id, req.body);
+      if (!ingredient) {
+        return res.status(404).json({ error: "Recipe ingredient not found" });
+      }
+      broadcastUpdate("recipe_ingredient_updated", ingredient);
+      res.json(ingredient);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update recipe ingredient" });
+    }
+  });
+
+  app.delete("/api/recipes/:recipeId/ingredients/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteRecipeIngredient(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Recipe ingredient not found" });
+      }
+      broadcastUpdate("recipe_ingredient_deleted", { id: req.params.id });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete recipe ingredient" });
+    }
+  });
+
+  app.delete("/api/recipes/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteRecipe(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Recipe not found" });
+      }
+      broadcastUpdate("recipe_deleted", { id: req.params.id });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete recipe" });
+    }
+  });
+
+  // Suppliers
+  app.get("/api/suppliers", async (req, res) => {
+    try {
+      const suppliers = await storage.getSuppliers();
+      res.json(suppliers);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch suppliers" });
+    }
+  });
+
+  app.post("/api/suppliers", async (req, res) => {
+    try {
+      const result = insertSupplierSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      const supplier = await storage.createSupplier(result.data);
+      broadcastUpdate("supplier_created", supplier);
+      res.json(supplier);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create supplier" });
+    }
+  });
+
+  app.patch("/api/suppliers/:id", async (req, res) => {
+    try {
+      const supplier = await storage.updateSupplier(req.params.id, req.body);
+      if (!supplier) {
+        return res.status(404).json({ error: "Supplier not found" });
+      }
+      broadcastUpdate("supplier_updated", supplier);
+      res.json(supplier);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update supplier" });
+    }
+  });
+
+  app.delete("/api/suppliers/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteSupplier(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Supplier not found" });
+      }
+      broadcastUpdate("supplier_deleted", { id: req.params.id });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete supplier" });
+    }
+  });
+
+  // Purchase Orders
+  app.get("/api/purchase-orders", async (req, res) => {
+    try {
+      const orders = await storage.getPurchaseOrders();
+      const ordersWithItems = await Promise.all(
+        orders.map(async (order) => {
+          const items = await storage.getPurchaseOrderItems(order.id);
+          const itemsWithDetails = await Promise.all(
+            items.map(async (item) => {
+              const inventoryItem = await storage.getInventoryItem(item.inventoryItemId);
+              return {
+                ...item,
+                inventoryItem,
+              };
+            })
+          );
+          const supplier = await storage.getSupplier(order.supplierId);
+          return {
+            ...order,
+            items: itemsWithDetails,
+            supplier,
+          };
+        })
+      );
+      res.json(ordersWithItems);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch purchase orders" });
+    }
+  });
+
+  app.get("/api/purchase-orders/:id", async (req, res) => {
+    try {
+      const order = await storage.getPurchaseOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ error: "Purchase order not found" });
+      }
+      
+      const items = await storage.getPurchaseOrderItems(order.id);
+      const itemsWithDetails = await Promise.all(
+        items.map(async (item) => {
+          const inventoryItem = await storage.getInventoryItem(item.inventoryItemId);
+          return {
+            ...item,
+            inventoryItem,
+          };
+        })
+      );
+      const supplier = await storage.getSupplier(order.supplierId);
+      
+      res.json({
+        ...order,
+        items: itemsWithDetails,
+        supplier,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch purchase order" });
+    }
+  });
+
+  app.post("/api/purchase-orders", async (req, res) => {
+    try {
+      const result = insertPurchaseOrderSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      const order = await storage.createPurchaseOrder(result.data);
+      broadcastUpdate("purchase_order_created", order);
+      res.json(order);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create purchase order" });
+    }
+  });
+
+  app.post("/api/purchase-orders/:id/items", async (req, res) => {
+    try {
+      const result = insertPurchaseOrderItemSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      const item = await storage.createPurchaseOrderItem({
+        ...result.data,
+        purchaseOrderId: req.params.id,
+      });
+      broadcastUpdate("purchase_order_item_added", item);
+      res.json(item);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to add purchase order item" });
+    }
+  });
+
+  app.patch("/api/purchase-orders/:id", async (req, res) => {
+    try {
+      const order = await storage.updatePurchaseOrder(req.params.id, req.body);
+      if (!order) {
+        return res.status(404).json({ error: "Purchase order not found" });
+      }
+      broadcastUpdate("purchase_order_updated", order);
+      res.json(order);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update purchase order" });
+    }
+  });
+
+  app.post("/api/purchase-orders/:id/receive", async (req, res) => {
+    try {
+      const order = await storage.receivePurchaseOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ error: "Purchase order not found" });
+      }
+      broadcastUpdate("purchase_order_received", order);
+      broadcastUpdate("inventory_updated", { purchaseOrderId: req.params.id });
+      res.json(order);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to receive purchase order" });
+    }
+  });
+
+  app.delete("/api/purchase-orders/:id", async (req, res) => {
+    try {
+      const success = await storage.deletePurchaseOrder(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Purchase order not found" });
+      }
+      broadcastUpdate("purchase_order_deleted", { id: req.params.id });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete purchase order" });
+    }
+  });
+
+  // Wastage
+  app.get("/api/wastage", async (req, res) => {
+    try {
+      const wastages = await storage.getWastages();
+      const wastagesWithDetails = await Promise.all(
+        wastages.map(async (wastage) => {
+          const inventoryItem = await storage.getInventoryItem(wastage.inventoryItemId);
+          return {
+            ...wastage,
+            inventoryItem,
+          };
+        })
+      );
+      res.json(wastagesWithDetails);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch wastage records" });
+    }
+  });
+
+  app.post("/api/wastage", async (req, res) => {
+    try {
+      const result = insertWastageSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      
+      // Auto-deduct from inventory
+      const inventoryItem = await storage.getInventoryItem(result.data.inventoryItemId);
+      if (!inventoryItem) {
+        return res.status(404).json({ error: "Inventory item not found" });
+      }
+      
+      const newStock = parseFloat(inventoryItem.currentStock) - parseFloat(result.data.quantity);
+      if (newStock < 0) {
+        return res.status(400).json({ error: "Insufficient stock for wastage entry" });
+      }
+      
+      await storage.updateInventoryQuantity(result.data.inventoryItemId, newStock.toString());
+      
+      const wastage = await storage.createWastage(result.data);
+      broadcastUpdate("wastage_created", wastage);
+      broadcastUpdate("inventory_updated", { wastageId: wastage.id });
+      res.json(wastage);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create wastage record" });
+    }
+  });
+
+  app.delete("/api/wastage/:id", async (req, res) => {
+    try {
+      const success = await storage.deleteWastage(req.params.id);
+      if (!success) {
+        return res.status(404).json({ error: "Wastage record not found" });
+      }
+      broadcastUpdate("wastage_deleted", { id: req.params.id });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete wastage record" });
+    }
+  });
+
+  // Seed Inventory and Recipes (admin endpoint)
+  app.post("/api/inventory/seed", async (req, res) => {
+    try {
+      if (typeof storage.seedInventoryAndRecipes !== 'function') {
+        return res.status(400).json({ error: "Seeding is only available with MongoDB storage" });
+      }
+      
+      const result = await storage.seedInventoryAndRecipes();
+      broadcastUpdate("inventory_seeded", result);
+      res.json({
+        success: true,
+        message: "Inventory and recipes seeded successfully",
+        ...result,
+      });
+    } catch (error) {
+      console.error("Error seeding inventory:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to seed inventory" });
+    }
+  });
+
+  // ==================== END INVENTORY MANAGEMENT API ROUTES ====================
 
   const digitalMenuSync = new DigitalMenuSyncService(storage);
   digitalMenuSync.setBroadcastFunction(broadcastUpdate);

@@ -153,6 +153,7 @@ export interface IStorage {
 
   getSetting(key: string): Promise<string | undefined>;
   setSetting(key: string, value: string): Promise<void>;
+  seedInventoryAndRecipes?(): Promise<{ inventoryCount: number; recipesCount: number; suppliersCount: number }>;
 }
 
 export class MemStorage implements IStorage {
