@@ -211,27 +211,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const items = await storage.getMenuItems();
       const usedCodes = new Set<string>();
-      let letterIndex = 0;
-      let numberIndex = 1;
+      const itemsNeedingCodes: typeof items = [];
+
+      // First pass: collect existing codes and items that need codes
+      for (const item of items) {
+        if (item.quickCode) {
+          usedCodes.add(item.quickCode);
+        } else {
+          itemsNeedingCodes.push(item);
+        }
+      }
+
+      // Generate unique codes for items that need them
+      const letters = "abcdefghijklmnopqrstuvwxyz";
       let updated = 0;
 
-      for (const item of items) {
-        if (!item.quickCode) {
-          let code: string;
-          const letters = "abcdefghijklmnopqrstuvwxyz";
-          
-          do {
-            const letter = letters[Math.floor(letterIndex / 100)];
-            const num = (letterIndex % 100) + 1;
-            code = `${letter}${num}`;
-            letterIndex++;
-          } while (usedCodes.has(code));
-
-          usedCodes.add(code);
-          await storage.updateMenuItem(item.id, { quickCode: code });
-          updated++;
-        } else {
-          usedCodes.add(item.quickCode);
+      for (const item of itemsNeedingCodes) {
+        let found = false;
+        for (let letterIdx = 0; letterIdx < letters.length && !found; letterIdx++) {
+          for (let num = 1; num <= 99 && !found; num++) {
+            const code = `${letters[letterIdx]}${num}`;
+            if (!usedCodes.has(code)) {
+              usedCodes.add(code);
+              await storage.updateMenuItem(item.id, { quickCode: code });
+              updated++;
+              found = true;
+            }
+          }
         }
       }
 
