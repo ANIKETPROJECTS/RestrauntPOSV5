@@ -324,37 +324,55 @@ export default function BillingPage() {
   const handleQuickCodeEntry = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Enter' || !quickCode.trim()) return;
     
-    const normalizedCode = quickCode.trim().toLowerCase();
-    const menuItem = menuItems.find((item) => 
-      item.quickCode && item.quickCode.toLowerCase() === normalizedCode
-    );
+    const codes = quickCode.split(',').map(code => code.trim()).filter(code => code.length > 0);
+    const notFoundCodes: string[] = [];
+    const unavailableCodes: string[] = [];
+    const addedItems: string[] = [];
     
-    if (!menuItem) {
-      toast({
-        title: "Item not found",
-        description: `No item found with quick code "${quickCode.trim()}"`,
-        variant: "destructive",
-      });
-      setQuickCode("");
-      return;
-    }
-    
-    if (!menuItem.available) {
-      toast({
-        title: "Item unavailable",
-        description: `${menuItem.name} is currently out of stock`,
-        variant: "destructive",
-      });
-      setQuickCode("");
-      return;
-    }
-    
-    handleAddItem(menuItem.id);
-    setQuickCode("");
-    toast({
-      title: "Item added",
-      description: `${menuItem.name} added to cart`,
+    codes.forEach(code => {
+      const normalizedCode = code.toLowerCase();
+      const menuItem = menuItems.find((item) => 
+        item.quickCode && item.quickCode.toLowerCase() === normalizedCode
+      );
+      
+      if (!menuItem) {
+        notFoundCodes.push(code);
+        return;
+      }
+      
+      if (!menuItem.available) {
+        unavailableCodes.push(menuItem.name);
+        return;
+      }
+      
+      handleAddItem(menuItem.id);
+      addedItems.push(menuItem.name);
     });
+    
+    setQuickCode("");
+    
+    if (addedItems.length > 0) {
+      toast({
+        title: `${addedItems.length} item${addedItems.length > 1 ? 's' : ''} added`,
+        description: addedItems.join(', '),
+      });
+    }
+    
+    if (notFoundCodes.length > 0) {
+      toast({
+        title: "Items not found",
+        description: `No items found with quick codes: ${notFoundCodes.join(', ')}`,
+        variant: "destructive",
+      });
+    }
+    
+    if (unavailableCodes.length > 0) {
+      toast({
+        title: "Items unavailable",
+        description: `Out of stock: ${unavailableCodes.join(', ')}`,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleAddItem = (itemId: string) => {
