@@ -207,3 +207,10 @@
 [x] 570. Architect reviewed and approved all three fixes - dialog layout, badge positioning, multi-code entry
 [x] 571. Successfully restarted application and verified all fixes are working correctly
 [x] 572. ✅ MENU AND POS ENHANCEMENTS COMPLETE - All user-requested features implemented and tested
+[x] 573. 🐛 Fixed critical bug in comma-separated quick code entry (November 21, 2025)
+[x] 574. Root cause: Array mutations violated React immutability - replaced with spread syntax and .map()
+[x] 575. Changed from `newItems.push()` to `updatedItems = [...updatedItems, newItem]` for new items
+[x] 576. Changed from direct index assignment to `.map()` for quantity increments
+[x] 577. Now ALL items are properly added when entering "a1,a2" not just the last one
+[x] 578. Architect verified fix - immutable state updates ensure React detects all changes correctly
+[x] 579. ✅ QUICK CODE MULTI-ITEM BUG FIXED - Now properly adds all comma-separated items
