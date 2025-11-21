@@ -534,7 +534,7 @@ export default function MenuPage() {
                   Add Item
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh]">
+              <DialogContent className="max-w-5xl max-h-[90vh]">
                 <DialogHeader>
                   <DialogTitle>Add New Menu Item</DialogTitle>
                 </DialogHeader>
@@ -550,45 +550,64 @@ export default function MenuPage() {
                       data-testid="input-item-name" 
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
-                    <Select name="category" required>
-                      <SelectTrigger data-testid="select-category">
-                        <SelectValue placeholder="Select Category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.filter(c => c !== "All").map((cat) => (
-                          <SelectItem key={cat} value={cat}>
-                            {cat}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="category">Category</Label>
+                      <Select name="category" required>
+                        <SelectTrigger data-testid="select-category">
+                          <SelectValue placeholder="Select Category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.filter(c => c !== "All").map((cat) => (
+                            <SelectItem key={cat} value={cat}>
+                              {cat}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="isVeg">Vegetarian</Label>
+                      <Select name="isVeg" defaultValue="true">
+                        <SelectTrigger data-testid="select-isVeg">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="true">Vegetarian</SelectItem>
+                          <SelectItem value="false">Non-Vegetarian</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="price">Price</Label>
-                    <Input 
-                      id="price"
-                      name="price"
-                      type="number"
-                      step="0.01"
-                      placeholder="Price"
-                      required
-                      data-testid="input-price" 
-                    />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="price">Price</Label>
+                      <Input 
+                        id="price"
+                        name="price"
+                        type="number"
+                        step="0.01"
+                        placeholder="Price"
+                        required
+                        data-testid="input-price" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="cost">Cost</Label>
+                      <Input 
+                        id="cost"
+                        name="cost"
+                        type="number"
+                        step="0.01"
+                        placeholder="Cost"
+                        required
+                        data-testid="input-cost" 
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cost">Cost</Label>
-                    <Input 
-                      id="cost"
-                      name="cost"
-                      type="number"
-                      step="0.01"
-                      placeholder="Cost"
-                      required
-                      data-testid="input-cost" 
-                    />
-                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="image">Image URL</Label>
                     <Input 
@@ -598,15 +617,7 @@ export default function MenuPage() {
                       data-testid="input-image" 
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea 
-                      id="description"
-                      name="description"
-                      placeholder="Item description"
-                      data-testid="input-description" 
-                    />
-                  </div>
+                  
                   <div className="space-y-2">
                     <Label htmlFor="quickCode">Quick Code (Optional)</Label>
                     <Input 
@@ -619,17 +630,15 @@ export default function MenuPage() {
                       Unique code for quick entry in POS. Each item must have a different code.
                     </p>
                   </div>
+                  
                   <div className="space-y-2">
-                    <Label htmlFor="isVeg">Vegetarian</Label>
-                    <Select name="isVeg" defaultValue="true">
-                      <SelectTrigger data-testid="select-isVeg">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="true">Vegetarian</SelectItem>
-                        <SelectItem value="false">Non-Vegetarian</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea 
+                      id="description"
+                      name="description"
+                      placeholder="Item description"
+                      data-testid="input-description" 
+                    />
                   </div>
 
                   <div className="border-t pt-4 space-y-3">
