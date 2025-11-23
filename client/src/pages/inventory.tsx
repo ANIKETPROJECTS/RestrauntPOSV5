@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { Plus, Edit, Trash2, Search, AlertTriangle } from "lucide-react";
+import { Plus, Edit, Trash2, Search, AlertTriangle, History } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
+import { useLocation } from "wouter";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import AppHeader from "@/components/AppHeader";
@@ -40,6 +41,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { InventoryItem, Supplier } from "@shared/schema";
+import { categoryUnits } from "@shared/schema";
 
 const inventoryFormSchema = z.object({
   name: z.string().min(1, "Name is required"),

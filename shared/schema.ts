@@ -397,6 +397,41 @@ export const insertFeedbackSchema = z.object({
 
 export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
 
+// InventoryUsage types - tracks when items are used
+export interface InventoryUsage {
+  id: string;
+  inventoryItemId: string;
+  itemName: string;
+  quantity: string;
+  unit: string;
+  usedAt: Date;
+  source: string;
+  notes: string | null;
+  createdAt: Date;
+}
+
+export const insertInventoryUsageSchema = z.object({
+  inventoryItemId: z.string(),
+  itemName: z.string(),
+  quantity: z.string(),
+  unit: z.string(),
+  source: z.string().default("manual"),
+  notes: z.string().nullable().optional(),
+});
+
+export type InsertInventoryUsage = z.infer<typeof insertInventoryUsageSchema>;
+
+// Category-specific units mapping
+export const categoryUnits: Record<string, string[]> = {
+  "Vegetables": ["kg", "g", "pcs", "bunch"],
+  "Meat": ["kg", "g", "pcs"],
+  "Dairy": ["L", "ml", "kg", "g", "pcs"],
+  "Spices": ["kg", "g", "ml"],
+  "Beverages": ["L", "ml", "pcs"],
+  "Bakery": ["kg", "g", "pcs"],
+  "Other": ["kg", "g", "L", "ml", "pcs"],
+};
+
 // Digital Menu Order types
 export interface DigitalMenuOrderItem {
   menuItemId: string;
