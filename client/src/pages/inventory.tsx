@@ -135,6 +135,21 @@ export default function InventoryPage() {
   });
 
   useEffect(() => {
+    console.log('[INVENTORY PAGE] Items fetched from /api/inventory:', items);
+    console.log('[INVENTORY PAGE] Total items count:', items.length);
+    console.log('[INVENTORY PAGE] Loading state:', isLoading);
+    
+    if (items.length > 0) {
+      const categoryCounts: Record<string, number> = {};
+      items.forEach(item => {
+        categoryCounts[item.category] = (categoryCounts[item.category] || 0) + 1;
+      });
+      console.log('[INVENTORY PAGE] Items by category:', categoryCounts);
+      console.log('[INVENTORY PAGE] Sample item:', items[0]);
+    }
+  }, [items, isLoading]);
+
+  useEffect(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const ws = new WebSocket(`${protocol}//${window.location.host}/api/ws`);
     
