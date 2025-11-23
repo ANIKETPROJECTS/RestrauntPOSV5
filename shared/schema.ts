@@ -161,6 +161,7 @@ export const insertInventoryItemSchema = z.object({
   minStock: z.string().default("0"),
   supplierId: z.string().nullable().optional(),
   costPerUnit: z.string().default("0"),
+  image: z.string().nullable().optional(),
 });
 
 export type InsertInventoryItem = z.infer<typeof insertInventoryItemSchema>;
