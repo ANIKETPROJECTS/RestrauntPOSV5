@@ -671,11 +671,14 @@ export default function InventoryPage() {
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ name, value }) => `${name}: ${value}`}
+                      label={({ name, value, x, y }) => (
+                        <text x={x} y={y} fill="#1F2937" fontSize="12" fontWeight="bold" textAnchor="middle" dominantBaseline="central">
+                          {name}: {value}
+                        </text>
+                      )}
                       outerRadius={150}
                       fill="#8884d8"
                       dataKey="value"
-                      labelStyle={{ fontSize: '12px', fill: '#000000', fontWeight: 'bold' }}
                       minAngle={15}
                     >
                       {['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B88B', '#A9DFBF', '#F9E2AF', '#D7BDE2', '#A3E4D7', '#F5B7B1', '#D5F4E6', '#FADBD8', '#D6EADF', '#EBD6DC', '#FCE4EC', '#E0E0E0'].map((color, idx) => (
