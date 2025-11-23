@@ -55,7 +55,29 @@ const inventoryFormSchema = z.object({
 
 type InventoryFormData = z.infer<typeof inventoryFormSchema>;
 
-const categories = ["All", "Vegetables", "Meat", "Dairy", "Spices", "Beverages", "Other"];
+const categories = [
+  "All",
+  "Vegetables & Produce",
+  "Meat & Poultry",
+  "Fish & Seafood",
+  "Dairy & Cheese",
+  "Bakery & Bread",
+  "Grains & Pasta",
+  "Oils & Condiments",
+  "Spices & Seasonings",
+  "Beverages",
+  "Fruits",
+  "Frozen Items",
+  "Canned & Packaged",
+  "Sauces & Dressings",
+  "Sugar & Sweeteners",
+  "Coffee & Tea",
+  "Eggs",
+  "Nuts & Seeds",
+  "Herbs & Aromatics",
+  "Dry Goods",
+  "Other",
+];
 const sortOptions = [
   { value: "name-asc", label: "Name A-Z" },
   { value: "name-desc", label: "Name Z-A" },

@@ -423,13 +423,26 @@ export type InsertInventoryUsage = z.infer<typeof insertInventoryUsageSchema>;
 
 // Category-specific units mapping
 export const categoryUnits: Record<string, string[]> = {
-  "Vegetables": ["kg", "g", "pcs", "bunch"],
-  "Meat": ["kg", "g", "pcs"],
-  "Dairy": ["L", "ml", "kg", "g", "pcs"],
-  "Spices": ["kg", "g", "ml"],
-  "Beverages": ["L", "ml", "pcs"],
-  "Bakery": ["kg", "g", "pcs"],
-  "Other": ["kg", "g", "L", "ml", "pcs"],
+  "Vegetables & Produce": ["kg", "g", "pcs", "bunch", "box"],
+  "Meat & Poultry": ["kg", "g", "pcs", "lb"],
+  "Fish & Seafood": ["kg", "g", "pcs", "lb"],
+  "Dairy & Cheese": ["L", "ml", "kg", "g", "pcs", "box"],
+  "Bakery & Bread": ["kg", "g", "pcs", "dozen", "box"],
+  "Grains & Pasta": ["kg", "g", "pcs", "bag"],
+  "Oils & Condiments": ["L", "ml", "kg", "bottle", "jar"],
+  "Spices & Seasonings": ["kg", "g", "ml", "jar"],
+  "Beverages": ["L", "ml", "pcs", "bottle", "can"],
+  "Fruits": ["kg", "g", "pcs", "bunch", "box"],
+  "Frozen Items": ["kg", "g", "pcs", "box"],
+  "Canned & Packaged": ["pcs", "can", "jar", "box", "kg"],
+  "Sauces & Dressings": ["L", "ml", "kg", "bottle", "jar"],
+  "Sugar & Sweeteners": ["kg", "g", "pcs", "box"],
+  "Coffee & Tea": ["kg", "g", "pcs", "box", "bag"],
+  "Eggs": ["pcs", "dozen", "crate"],
+  "Nuts & Seeds": ["kg", "g", "pcs", "bag"],
+  "Herbs & Aromatics": ["kg", "g", "bunch", "pcs"],
+  "Dry Goods": ["kg", "g", "pcs", "bag", "box"],
+  "Other": ["kg", "g", "L", "ml", "pcs", "box"],
 };
 
 // Digital Menu Order types
