@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Plus, Edit, Trash2, Search, AlertTriangle, History, Grid3x3, List, ChevronDown, ChevronUp, Eye, TrendingUp, Package, AlertCircle, Zap, ArrowLeft } from "lucide-react";
+import { Plus, Edit, Trash2, Search, AlertTriangle, History, Grid3x3, List, ChevronDown, ChevronUp, Eye, TrendingUp, Package, AlertCircle, Zap, ArrowLeft, BarChart3, Calendar } from "lucide-react";
+import { PieChart, Pie, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { useLocation } from "wouter";
@@ -606,72 +607,147 @@ export default function InventoryPage() {
             )}
           </TabsContent>
 
-          <TabsContent value="reports" className="m-0 p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <TabsContent value="reports" className="m-0 p-6 space-y-6 overflow-y-auto">
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <Card className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-purple-600 font-medium">Total Categories</p>
-                    <p className="text-3xl font-bold text-purple-700">{categories.filter(c => c !== "All").length}</p>
+                    <p className="text-sm text-purple-600 font-medium">Total Items</p>
+                    <p className="text-3xl font-bold text-purple-700">{items.length}</p>
                   </div>
-                  <Zap className="h-8 w-8 text-purple-400" />
+                  <Package className="h-8 w-8 text-purple-400" />
                 </div>
               </Card>
 
-              <Card className="p-4 bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200">
+              <Card className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-indigo-600 font-medium">Categories with Items</p>
-                    <p className="text-3xl font-bold text-indigo-700">{Object.values(itemsByCategory).filter(items => items.length > 0).length}</p>
+                    <p className="text-sm text-blue-600 font-medium">Total Value</p>
+                    <p className="text-3xl font-bold text-blue-700">₹{(items.reduce((sum, item) => sum + (parseFloat(item.currentStock) * parseFloat(item.costPerUnit)), 0) / 100000).toFixed(1)}L</p>
                   </div>
-                  <Package className="h-8 w-8 text-indigo-400" />
+                  <TrendingUp className="h-8 w-8 text-blue-400" />
                 </div>
               </Card>
 
-              <Card className="p-4 bg-gradient-to-br from-teal-50 to-teal-100 border-teal-200">
+              <Card className="p-4 bg-gradient-to-br from-green-50 to-green-100 border-green-200">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-teal-600 font-medium">Avg Cost Per Unit</p>
-                    <p className="text-3xl font-bold text-teal-700">₹{filteredItems.length > 0 ? (filteredItems.reduce((sum, item) => sum + parseFloat(item.costPerUnit), 0) / filteredItems.length).toFixed(2) : "0"}</p>
+                    <p className="text-sm text-green-600 font-medium">Well Stocked</p>
+                    <p className="text-3xl font-bold text-green-700">{items.filter(item => parseFloat(item.currentStock) >= parseFloat(item.minStock)).length}</p>
                   </div>
-                  <TrendingUp className="h-8 w-8 text-teal-400" />
+                  <Zap className="h-8 w-8 text-green-400" />
+                </div>
+              </Card>
+
+              <Card className="p-4 bg-gradient-to-br from-red-50 to-red-100 border-red-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-red-600 font-medium">Low Stock Items</p>
+                    <p className="text-3xl font-bold text-red-700">{lowStockItems.length}</p>
+                  </div>
+                  <AlertCircle className="h-8 w-8 text-red-400" />
                 </div>
               </Card>
             </div>
 
-            <Card className="p-6 border-gray-200">
-              <h3 className="text-lg font-semibold mb-4">Category Breakdown</h3>
-              <div className="space-y-3">
-                {Object.entries(itemsByCategory)
-                  .filter(([, items]) => items.length > 0)
-                  .sort((a, b) => b[1].length - a[1].length)
-                  .map(([category, catItems]) => {
-                    const totalValue = catItems.reduce((sum, item) => sum + (parseFloat(item.currentStock) * parseFloat(item.costPerUnit)), 0);
-                    const avgStock = catItems.reduce((sum, item) => sum + parseFloat(item.currentStock), 0) / catItems.length;
-                    return (
-                      <div key={category} className={`p-4 rounded-lg border ${categoryColors[category as keyof typeof categoryColors] || categoryColors["Other"]}`}>
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-semibold text-gray-800">{category}</p>
-                            <p className="text-sm text-gray-600">{catItems.length} items • Avg Stock: {avgStock.toFixed(1)}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-semibold text-gray-800">₹{totalValue.toFixed(2)}</p>
-                            <p className="text-sm text-gray-600">Category Value</p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
+            {/* Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Category Distribution Pie Chart */}
+              <Card className="p-6 border-2 border-indigo-200">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-indigo-600" />
+                  Category Distribution
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={Object.entries(itemsByCategory)
+                        .filter(([, items]) => items.length > 0)
+                        .map(([category, items]) => ({
+                          name: category,
+                          value: items.length,
+                        }))}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, value }) => `${name}: ${value}`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B88B', '#A9DFBF', '#F9E2AF', '#D7BDE2', '#A3E4D7', '#F5B7B1', '#D5F4E6', '#FADBD8', '#D6EADF', '#EBD6DC', '#FCE4EC', '#E0E0E0'].map((color, idx) => (
+                        <Cell key={`cell-${idx}`} fill={color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => `${value} items`} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Card>
+
+              {/* Category Value Bar Chart */}
+              <Card className="p-6 border-2 border-green-200">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-green-600" />
+                  Inventory Value by Category
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart
+                    data={Object.entries(itemsByCategory)
+                      .filter(([, items]) => items.length > 0)
+                      .map(([category, items]) => ({
+                        category: category.split(' ')[0],
+                        value: items.reduce((sum, item) => sum + (parseFloat(item.currentStock) * parseFloat(item.costPerUnit)), 0) / 1000,
+                      }))
+                      .sort((a, b) => b.value - a.value)
+                      .slice(0, 10)}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="category" />
+                    <YAxis />
+                    <Tooltip formatter={(value) => `₹${value.toFixed(0)}K`} />
+                    <Bar dataKey="value" fill="#10B981" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+            </div>
+
+            {/* Stock Level Trends */}
+            <Card className="p-6 border-2 border-orange-200">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-orange-600" />
+                Average Stock Levels by Category
+              </h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart
+                  data={Object.entries(itemsByCategory)
+                    .filter(([, items]) => items.length > 0)
+                    .map(([category, items]) => ({
+                      category: category.split(' ')[0],
+                      avgStock: (items.reduce((sum, item) => sum + parseFloat(item.currentStock), 0) / items.length).toFixed(1),
+                      itemCount: items.length,
+                    }))
+                    .sort((a, b) => parseFloat(b.avgStock) - parseFloat(a.avgStock))}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="category" />
+                  <YAxis yAxisId="left" />
+                  <YAxis yAxisId="right" orientation="right" />
+                  <Tooltip />
+                  <Legend />
+                  <Line yAxisId="left" type="monotone" dataKey="avgStock" stroke="#F97316" name="Avg Stock" strokeWidth={2} />
+                  <Line yAxisId="right" type="monotone" dataKey="itemCount" stroke="#3B82F6" name="Item Count" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
             </Card>
 
+            {/* Detailed Lists */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Card className="p-6 border-red-200 bg-gradient-to-br from-red-50 to-red-100">
-                <h3 className="text-lg font-semibold mb-4 text-red-800">Low Stock Alert</h3>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
+                <h3 className="text-lg font-semibold mb-4 text-red-800">Low Stock Alert ({lowStockItems.length})</h3>
+                <div className="space-y-2 max-h-80 overflow-y-auto">
                   {lowStockItems.length > 0 ? (
-                    lowStockItems.map(item => (
+                    lowStockItems.slice(0, 15).map(item => (
                       <div key={item.id} className="p-3 bg-white rounded border border-red-200">
                         <p className="font-medium text-gray-800">{item.name}</p>
                         <p className="text-sm text-red-600">Stock: {item.currentStock} / Min: {item.minStock} {item.unit}</p>
@@ -684,20 +760,61 @@ export default function InventoryPage() {
               </Card>
 
               <Card className="p-6 border-green-200 bg-gradient-to-br from-green-50 to-green-100">
-                <h3 className="text-lg font-semibold mb-4 text-green-800">Top 10 Most Valuable</h3>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {filteredItems
+                <h3 className="text-lg font-semibold mb-4 text-green-800">Top 10 Most Valuable Items</h3>
+                <div className="space-y-2 max-h-80 overflow-y-auto">
+                  {items
                     .sort((a, b) => (parseFloat(b.currentStock) * parseFloat(b.costPerUnit)) - (parseFloat(a.currentStock) * parseFloat(a.costPerUnit)))
                     .slice(0, 10)
                     .map(item => (
                       <div key={item.id} className="p-3 bg-white rounded border border-green-200">
                         <p className="font-medium text-gray-800">{item.name}</p>
-                        <p className="text-sm text-green-600">Value: ₹{(parseFloat(item.currentStock) * parseFloat(item.costPerUnit)).toFixed(2)}</p>
+                        <p className="text-sm text-green-600">Value: ₹{(parseFloat(item.currentStock) * parseFloat(item.costPerUnit)).toFixed(2)} | Stock: {item.currentStock} {item.unit}</p>
                       </div>
                     ))}
                 </div>
               </Card>
             </div>
+
+            {/* Category Breakdown Table */}
+            <Card className="p-6 border-gray-200">
+              <h3 className="text-lg font-semibold mb-4">Category Breakdown Report</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-300">
+                      <th className="text-left p-3 font-semibold text-gray-700">Category</th>
+                      <th className="text-center p-3 font-semibold text-gray-700">Items</th>
+                      <th className="text-center p-3 font-semibold text-gray-700">Avg Stock</th>
+                      <th className="text-center p-3 font-semibold text-gray-700">Total Value</th>
+                      <th className="text-center p-3 font-semibold text-gray-700">Low Stock</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(itemsByCategory)
+                      .filter(([, items]) => items.length > 0)
+                      .sort((a, b) => b[1].length - a[1].length)
+                      .map(([category, catItems]) => {
+                        const totalValue = catItems.reduce((sum, item) => sum + (parseFloat(item.currentStock) * parseFloat(item.costPerUnit)), 0);
+                        const avgStock = (catItems.reduce((sum, item) => sum + parseFloat(item.currentStock), 0) / catItems.length).toFixed(1);
+                        const lowCount = catItems.filter(item => parseFloat(item.currentStock) < parseFloat(item.minStock)).length;
+                        return (
+                          <tr key={category} className="border-b border-gray-200 hover:bg-gray-50">
+                            <td className="p-3 text-gray-800 font-medium">{category}</td>
+                            <td className="text-center p-3 text-gray-600">{catItems.length}</td>
+                            <td className="text-center p-3 text-gray-600">{avgStock}</td>
+                            <td className="text-center p-3 text-blue-600 font-semibold">₹{totalValue.toFixed(0)}</td>
+                            <td className="text-center p-3">
+                              <span className={lowCount > 0 ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold'}>
+                                {lowCount}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           </TabsContent>
         </div>
       </Tabs>
