@@ -34,6 +34,8 @@ import {
   type InsertCustomer,
   type Feedback,
   type InsertFeedback,
+  type InventoryUsage,
+  type InsertInventoryUsage,
 } from "@shared/schema";
 import { IStorage } from './storage';
 import { randomUUID } from 'crypto';
@@ -1000,6 +1002,68 @@ export class MongoStorage implements IStorage {
       { $set: { key, value } },
       { upsert: true }
     );
+  }
+
+  async getInventoryUsages(): Promise<InventoryUsage[]> {
+    await this.ensureConnection();
+    const usages = await mongodb.getCollection<InventoryUsage>('inventoryUsages').find().sort({ usedAt: -1 }).toArray();
+    return usages;
+  }
+
+  async getInventoryUsagesByItem(inventoryItemId: string): Promise<InventoryUsage[]> {
+    await this.ensureConnection();
+    const usages = await mongodb.getCollection<InventoryUsage>('inventoryUsages').find({ inventoryItemId } as any).sort({ usedAt: -1 }).toArray();
+    return usages;
+  }
+
+  async createInventoryUsage(usage: InsertInventoryUsage): Promise<InventoryUsage> {
+    await this.ensureConnection();
+    const id = randomUUID();
+    const newUsage: InventoryUsage = {
+      id,
+      inventoryItemId: usage.inventoryItemId,
+      itemName: usage.itemName,
+      quantity: usage.quantity,
+      unit: usage.unit,
+      usedAt: new Date(),
+      source: usage.source || "manual",
+      notes: usage.notes || null,
+      createdAt: new Date(),
+    };
+    await mongodb.getCollection<InventoryUsage>('inventoryUsages').insertOne(newUsage as any);
+    return newUsage;
+  }
+
+  async getMostUsedItems(limit: number = 10): Promise<Array<{ itemId: string; itemName: string; totalQuantity: string; count: number }>> {
+    await this.ensureConnection();
+    const usages = await mongodb.getCollection<InventoryUsage>('inventoryUsages').find().toArray();
+    
+    const itemMap = new Map<string, { itemName: string; totalQuantity: number; count: number }>();
+    
+    for (const usage of usages) {
+      const key = usage.inventoryItemId;
+      const qty = parseFloat(usage.quantity) || 0;
+      
+      if (!itemMap.has(key)) {
+        itemMap.set(key, { itemName: usage.itemName, totalQuantity: qty, count: 1 });
+      } else {
+        const existing = itemMap.get(key)!;
+        existing.totalQuantity += qty;
+        existing.count += 1;
+      }
+    }
+    
+    const sorted = Array.from(itemMap.entries())
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, limit)
+      .map(([itemId, data]) => ({
+        itemId,
+        itemName: data.itemName,
+        totalQuantity: data.totalQuantity.toString(),
+        count: data.count,
+      }));
+    
+    return sorted;
   }
 
   async seedInventoryAndRecipes(): Promise<{ inventoryCount: number; recipesCount: number; suppliersCount: number }> {

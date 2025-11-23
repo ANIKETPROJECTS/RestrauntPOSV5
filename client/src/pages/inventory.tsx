@@ -71,6 +71,7 @@ export default function InventoryPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [, navigate] = useLocation();
   const { toast } = useToast();
 
   const { data: items = [], isLoading } = useQuery<InventoryItem[]>({
@@ -252,17 +253,27 @@ export default function InventoryPage() {
               </>
             )}
           </div>
-          <Button
-            onClick={() => {
-              form.reset();
-              setEditingItem(null);
-              setIsAddDialogOpen(true);
-            }}
-            data-testid="button-add-inventory"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Inventory
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => navigate("/inventory-history")}
+              data-testid="button-history"
+            >
+              <History className="h-4 w-4 mr-2" />
+              History
+            </Button>
+            <Button
+              onClick={() => {
+                form.reset();
+                setEditingItem(null);
+                setIsAddDialogOpen(true);
+              }}
+              data-testid="button-add-inventory"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Inventory
+            </Button>
+          </div>
         </div>
 
         <div className="flex items-center gap-4">

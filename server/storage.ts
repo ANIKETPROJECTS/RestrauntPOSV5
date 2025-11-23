@@ -33,6 +33,8 @@ import {
   type InsertCustomer,
   type Feedback,
   type InsertFeedback,
+  type InventoryUsage,
+  type InsertInventoryUsage,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -153,6 +155,12 @@ export interface IStorage {
 
   getSetting(key: string): Promise<string | undefined>;
   setSetting(key: string, value: string): Promise<void>;
+  
+  getInventoryUsages(): Promise<InventoryUsage[]>;
+  getInventoryUsagesByItem(inventoryItemId: string): Promise<InventoryUsage[]>;
+  createInventoryUsage(usage: InsertInventoryUsage): Promise<InventoryUsage>;
+  getMostUsedItems(limit?: number): Promise<Array<{ itemId: string; itemName: string; totalQuantity: string; count: number }>>;
+  
   seedInventoryAndRecipes?(): Promise<{ inventoryCount: number; recipesCount: number; suppliersCount: number }>;
 }
 
