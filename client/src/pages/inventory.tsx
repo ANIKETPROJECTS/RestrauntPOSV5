@@ -508,7 +508,7 @@ export default function InventoryPage() {
                       .map(item => (
                         <Card
                           key={item.id}
-                          className="overflow-hidden hover:shadow-lg transition-shadow border border-gray-200 bg-white"
+                          className="overflow-hidden hover:shadow-lg transition-shadow border-2 border-gray-400 bg-white"
                           data-testid={`card-item-${item.id}`}
                         >
                           <div className="p-3">
