@@ -150,6 +150,7 @@ export interface InventoryItem {
   minStock: string;
   supplierId: string | null;
   costPerUnit: string;
+  image: string | null;
   lastUpdated: Date;
 }
 

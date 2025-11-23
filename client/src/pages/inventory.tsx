@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Edit, Trash2, Search, AlertTriangle, History, Grid3x3, List, ChevronDown, ChevronUp, Eye } from "lucide-react";
+import { Plus, Edit, Trash2, Search, AlertTriangle, History, Grid3x3, List, ChevronDown, ChevronUp, Eye, TrendingUp, Package, AlertCircle, Zap } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { useLocation } from "wouter";
@@ -9,6 +9,7 @@ import AppHeader from "@/components/AppHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -38,6 +39,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { InventoryItem, Supplier } from "@shared/schema";
@@ -80,6 +87,29 @@ const categories = [
   "Other",
 ];
 
+const categoryColors: Record<string, string> = {
+  "Vegetables & Produce": "bg-gradient-to-br from-green-50 to-emerald-50 border-green-200",
+  "Meat & Poultry": "bg-gradient-to-br from-red-50 to-pink-50 border-red-200",
+  "Fish & Seafood": "bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200",
+  "Dairy & Cheese": "bg-gradient-to-br from-yellow-50 to-orange-50 border-yellow-200",
+  "Bakery & Bread": "bg-gradient-to-br from-orange-50 to-amber-50 border-orange-200",
+  "Grains & Pasta": "bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200",
+  "Oils & Condiments": "bg-gradient-to-br from-yellow-50 to-lime-50 border-yellow-200",
+  "Spices & Seasonings": "bg-gradient-to-br from-rose-50 to-pink-50 border-rose-200",
+  "Beverages": "bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200",
+  "Fruits": "bg-gradient-to-br from-pink-50 to-red-50 border-pink-200",
+  "Frozen Items": "bg-gradient-to-br from-blue-50 to-slate-50 border-blue-200",
+  "Canned & Packaged": "bg-gradient-to-br from-gray-50 to-slate-50 border-gray-200",
+  "Sauces & Dressings": "bg-gradient-to-br from-orange-50 to-red-50 border-orange-200",
+  "Sugar & Sweeteners": "bg-gradient-to-br from-pink-50 to-red-50 border-pink-200",
+  "Coffee & Tea": "bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200",
+  "Eggs": "bg-gradient-to-br from-yellow-50 to-orange-50 border-yellow-200",
+  "Nuts & Seeds": "bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200",
+  "Herbs & Aromatics": "bg-gradient-to-br from-green-50 to-lime-50 border-green-200",
+  "Dry Goods": "bg-gradient-to-br from-gray-50 to-slate-50 border-gray-200",
+  "Other": "bg-gradient-to-br from-slate-50 to-gray-50 border-slate-200",
+};
+
 export default function InventoryPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
@@ -91,6 +121,8 @@ export default function InventoryPage() {
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("inventory");
+  const [dateFilter, setDateFilter] = useState("all");
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -231,6 +263,8 @@ export default function InventoryPage() {
   }, {} as Record<string, InventoryItem[]>);
 
   const lowStockItems = filteredItems.filter(item => item.currentStock <= item.minStock);
+  const totalValue = filteredItems.reduce((sum, item) => sum + (parseFloat(item.currentStock) * parseFloat(item.costPerUnit)), 0);
+  const outOfStock = filteredItems.filter(item => parseFloat(item.currentStock) === 0).length;
 
   if (isLoading) {
     return <div className="p-6 text-center">Loading inventory...</div>;
@@ -240,266 +274,391 @@ export default function InventoryPage() {
     <div className="h-screen flex flex-col">
       <AppHeader title="Inventory Management" />
 
-      <div className="flex-1 overflow-y-auto">
-        <div className="p-6">
-          <div className="flex items-center justify-between gap-4 mb-6">
-            <div className="flex items-center gap-4">
-              <h3 className="font-semibold">Total Items: <span className="text-lg font-bold">{items.length}</span></h3>
-              {lowStockItems.length > 0 && (
-                <div className="flex items-center gap-2 text-destructive">
-                  <AlertTriangle className="h-4 w-4" />
-                  <span>Low Stock: {lowStockItems.length}</span>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+        <div className="border-b bg-background px-6 pt-4">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="inventory">Inventory</TabsTrigger>
+            <TabsTrigger value="reports">Reports</TabsTrigger>
+          </TabsList>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          <TabsContent value="inventory" className="m-0 p-6 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-blue-600 font-medium">Total Items</p>
+                    <p className="text-3xl font-bold text-blue-700">{items.length}</p>
+                  </div>
+                  <Package className="h-8 w-8 text-blue-400" />
                 </div>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Button
-                onClick={() => navigate("/inventory-history")}
-                variant="outline"
-                size="sm"
-                data-testid="button-history"
-              >
-                <History className="h-4 w-4 mr-2" />
-                History
-              </Button>
-              <Button
-                onClick={() => setIsListView(!isListView)}
-                variant="outline"
-                size="sm"
-                data-testid="button-toggle-view"
-              >
-                {isListView ? (
-                  <>
-                    <Grid3x3 className="h-4 w-4 mr-2" />
-                    Card View
-                  </>
-                ) : (
-                  <>
-                    <List className="h-4 w-4 mr-2" />
-                    List View
-                  </>
-                )}
-              </Button>
-              <Button
-                onClick={() => {
-                  setEditingItem(null);
-                  form.reset();
-                  setImagePreview(null);
-                  setIsAddDialogOpen(true);
-                }}
-                data-testid="button-add-inventory"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Inventory
-              </Button>
-            </div>
-          </div>
+              </Card>
 
-          <div className="flex gap-4 mb-6">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search items..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-                data-testid="input-search"
-              />
-            </div>
-            {isListView && (
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-48" data-testid="select-category-filter">
-                  <SelectValue placeholder="Filter by category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map(cat => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
+              <Card className="p-4 bg-gradient-to-br from-red-50 to-red-100 border-red-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-red-600 font-medium">Low Stock</p>
+                    <p className="text-3xl font-bold text-red-700">{lowStockItems.length}</p>
+                  </div>
+                  <AlertTriangle className="h-8 w-8 text-red-400" />
+                </div>
+              </Card>
 
-          {isListView ? (
-            <div className="border border-border rounded-lg overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead className="text-center">Current Stock</TableHead>
-                    <TableHead className="text-center">Unit</TableHead>
-                    <TableHead className="text-center">Min Stock</TableHead>
-                    <TableHead className="text-center">Cost/Unit</TableHead>
-                    <TableHead className="text-center">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredItems.map(item => (
-                    <TableRow
-                      key={item.id}
-                      className={item.currentStock <= item.minStock ? "bg-destructive/10" : ""}
-                      data-testid={`row-item-${item.id}`}
-                    >
-                      <TableCell className="font-medium">{item.name}</TableCell>
-                      <TableCell>{item.category}</TableCell>
-                      <TableCell className="text-center">
-                        <span className={item.currentStock <= item.minStock ? "font-bold text-destructive" : ""}>
-                          {item.currentStock}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center">{item.unit}</TableCell>
-                      <TableCell className="text-center">{item.minStock}</TableCell>
-                      <TableCell className="text-center">₹{parseFloat(item.costPerUnit.toString()).toFixed(2)}</TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex justify-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              setSelectedItem(item);
-                              setIsDetailsDialogOpen(true);
-                            }}
-                            data-testid={`button-view-${item.id}`}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleEdit(item)}
-                            data-testid={`button-edit-${item.id}`}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => deleteMutation.mutate(item.id)}
-                            data-testid={`button-delete-${item.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
+              <Card className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-orange-600 font-medium">Out of Stock</p>
+                    <p className="text-3xl font-bold text-orange-700">{outOfStock}</p>
+                  </div>
+                  <AlertCircle className="h-8 w-8 text-orange-400" />
+                </div>
+              </Card>
+
+              <Card className="p-4 bg-gradient-to-br from-green-50 to-green-100 border-green-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-green-600 font-medium">Total Value</p>
+                    <p className="text-2xl font-bold text-green-700">₹{totalValue.toFixed(2)}</p>
+                  </div>
+                  <TrendingUp className="h-8 w-8 text-green-400" />
+                </div>
+              </Card>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search items..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                  data-testid="input-search"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => navigate("/inventory-history")}
+                  variant="outline"
+                  size="sm"
+                  data-testid="button-history"
+                >
+                  <History className="h-4 w-4 mr-2" />
+                  History
+                </Button>
+                <Button
+                  onClick={() => setIsListView(!isListView)}
+                  variant="outline"
+                  size="sm"
+                  data-testid="button-toggle-view"
+                >
+                  {isListView ? (
+                    <>
+                      <Grid3x3 className="h-4 w-4 mr-2" />
+                      Card View
+                    </>
+                  ) : (
+                    <>
+                      <List className="h-4 w-4 mr-2" />
+                      List View
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={() => {
+                    setEditingItem(null);
+                    form.reset();
+                    setImagePreview(null);
+                    setIsAddDialogOpen(true);
+                  }}
+                  data-testid="button-add-inventory"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Item
+                </Button>
+              </div>
+            </div>
+
+            {isListView ? (
+              <div className="border border-border rounded-lg overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead className="text-center">Current Stock</TableHead>
+                      <TableHead className="text-center">Unit</TableHead>
+                      <TableHead className="text-center">Min Stock</TableHead>
+                      <TableHead className="text-center">Cost/Unit</TableHead>
+                      <TableHead className="text-center">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {Object.entries(itemsByCategory).map(([category, catItems]) => (
-                <div key={category} className="border border-border rounded-lg overflow-hidden">
-                  <button
-                    onClick={() => setExpandedCategories(prev => ({
-                      ...prev,
-                      [category]: !prev[category]
-                    }))}
-                    className="w-full flex items-center justify-between gap-2 bg-card hover:bg-accent/50 p-4 transition-colors"
-                    data-testid={`button-category-${category}`}
-                  >
-                    <h3 className="font-semibold text-lg">{category}</h3>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary">{catItems.length} items</Badge>
-                      {expandedCategories[category] ? (
-                        <ChevronUp className="h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4" />
-                      )}
-                    </div>
-                  </button>
-
-                  {expandedCategories[category] && (
-                    <div className="p-4 bg-background">
-                      {catItems.length === 0 ? (
-                        <div className="text-center py-8 text-muted-foreground">
-                          No items in this category
-                        </div>
-                      ) : (
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                        {catItems.map(item => (
-                          <div
-                            key={item.id}
-                            className="border border-border rounded-lg p-3 hover:shadow-md transition-shadow"
-                            data-testid={`card-item-${item.id}`}
-                          >
-                            {item.image ? (
-                              <div className="h-24 bg-muted rounded mb-2 overflow-hidden">
-                                <img
-                                  src={item.image}
-                                  alt={item.name}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                            ) : (
-                              <div className="h-24 bg-muted rounded mb-2 flex items-center justify-center text-muted-foreground text-xs">
-                                No image
-                              </div>
-                            )}
-                            <h4 className="font-semibold text-sm line-clamp-2 mb-2">{item.name}</h4>
-                            <div className="space-y-1 text-xs mb-3">
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Qty:</span>
-                                <span className={item.currentStock <= item.minStock ? "font-bold text-destructive" : "font-semibold"}>
-                                  {item.currentStock} {item.unit}
-                                </span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Price:</span>
-                                <span className="font-semibold">₹{parseFloat(item.costPerUnit.toString()).toFixed(2)}</span>
-                              </div>
-                            </div>
-                            <div className="flex gap-1">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="flex-1 h-7"
-                                onClick={() => {
-                                  setSelectedItem(item);
-                                  setIsDetailsDialogOpen(true);
-                                }}
-                                data-testid={`button-view-card-${item.id}`}
-                              >
-                                <Eye className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="flex-1 h-7"
-                                onClick={() => handleEdit(item)}
-                                data-testid={`button-edit-card-${item.id}`}
-                              >
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="flex-1 h-7"
-                                onClick={() => deleteMutation.mutate(item.id)}
-                                data-testid={`button-delete-card-${item.id}`}
-                              >
-                                <Trash2 className="h-3 w-3 text-destructive" />
-                              </Button>
-                            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredItems.map(item => (
+                      <TableRow
+                        key={item.id}
+                        className={item.currentStock <= item.minStock ? "bg-destructive/10" : ""}
+                        data-testid={`row-item-${item.id}`}
+                      >
+                        <TableCell className="font-medium">{item.name}</TableCell>
+                        <TableCell>{item.category}</TableCell>
+                        <TableCell className="text-center">
+                          <span className={item.currentStock <= item.minStock ? "font-bold text-destructive" : ""}>
+                            {item.currentStock}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center">{item.unit}</TableCell>
+                        <TableCell className="text-center">{item.minStock}</TableCell>
+                        <TableCell className="text-center">₹{parseFloat(item.costPerUnit.toString()).toFixed(2)}</TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex justify-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setSelectedItem(item);
+                                setIsDetailsDialogOpen(true);
+                              }}
+                              data-testid={`button-view-${item.id}`}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleEdit(item)}
+                              data-testid={`button-edit-${item.id}`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => deleteMutation.mutate(item.id)}
+                              data-testid={`button-delete-${item.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
                           </div>
-                        ))}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {Object.entries(itemsByCategory).map(([category, catItems]) => (
+                  <Card
+                    key={category}
+                    className={`overflow-hidden border ${categoryColors[category as keyof typeof categoryColors] || categoryColors["Other"]}`}
+                  >
+                    <button
+                      onClick={() => setExpandedCategories(prev => ({
+                        ...prev,
+                        [category]: !prev[category]
+                      }))}
+                      className="w-full flex items-center justify-between gap-2 p-4 hover:opacity-80 transition-opacity"
+                      data-testid={`button-category-${category}`}
+                    >
+                      <h3 className="font-semibold text-lg text-gray-800">{category}</h3>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">{catItems.length} items</Badge>
+                        {expandedCategories[category] ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
                       </div>
-                      )}
-                    </div>
+                    </button>
+
+                    {expandedCategories[category] && catItems.length > 0 && (
+                      <div className="p-4 bg-white/50">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                          {catItems.map(item => (
+                            <Card
+                              key={item.id}
+                              className="overflow-hidden hover:shadow-lg transition-shadow border-0 bg-white"
+                              data-testid={`card-item-${item.id}`}
+                            >
+                              <div className="p-3">
+                                {item.image ? (
+                                  <div className="h-24 bg-muted rounded mb-2 overflow-hidden">
+                                    <img
+                                      src={item.image}
+                                      alt={item.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded mb-2 flex items-center justify-center text-muted-foreground text-xs">
+                                    No image
+                                  </div>
+                                )}
+                                <h4 className="font-semibold text-sm line-clamp-2 mb-2 text-gray-800">{item.name}</h4>
+                                <div className="space-y-1 text-xs mb-3">
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Qty:</span>
+                                    <span className={item.currentStock <= item.minStock ? "font-bold text-destructive" : "font-semibold text-green-600"}>
+                                      {item.currentStock} {item.unit}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Price:</span>
+                                    <span className="font-semibold text-blue-600">₹{parseFloat(item.costPerUnit.toString()).toFixed(2)}</span>
+                                  </div>
+                                </div>
+                                <div className="flex gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="flex-1 h-7 text-xs"
+                                    onClick={() => {
+                                      setSelectedItem(item);
+                                      setIsDetailsDialogOpen(true);
+                                    }}
+                                    data-testid={`button-view-card-${item.id}`}
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="flex-1 h-7 text-xs"
+                                    onClick={() => handleEdit(item)}
+                                    data-testid={`button-edit-card-${item.id}`}
+                                  >
+                                    <Edit className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="flex-1 h-7 text-xs"
+                                    onClick={() => deleteMutation.mutate(item.id)}
+                                    data-testid={`button-delete-card-${item.id}`}
+                                  >
+                                    <Trash2 className="h-3 w-3 text-destructive" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {expandedCategories[category] && catItems.length === 0 && (
+                      <div className="p-8 text-center text-muted-foreground text-sm">
+                        No items in this category
+                      </div>
+                    )}
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {filteredItems.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground">
+                No items found matching your search
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="reports" className="m-0 p-6 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-purple-600 font-medium">Total Categories</p>
+                    <p className="text-3xl font-bold text-purple-700">{categories.filter(c => c !== "All").length}</p>
+                  </div>
+                  <Zap className="h-8 w-8 text-purple-400" />
+                </div>
+              </Card>
+
+              <Card className="p-4 bg-gradient-to-br from-indigo-50 to-indigo-100 border-indigo-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-indigo-600 font-medium">Categories with Items</p>
+                    <p className="text-3xl font-bold text-indigo-700">{Object.values(itemsByCategory).filter(items => items.length > 0).length}</p>
+                  </div>
+                  <Package className="h-8 w-8 text-indigo-400" />
+                </div>
+              </Card>
+
+              <Card className="p-4 bg-gradient-to-br from-teal-50 to-teal-100 border-teal-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-teal-600 font-medium">Avg Cost Per Unit</p>
+                    <p className="text-3xl font-bold text-teal-700">₹{filteredItems.length > 0 ? (filteredItems.reduce((sum, item) => sum + parseFloat(item.costPerUnit), 0) / filteredItems.length).toFixed(2) : "0"}</p>
+                  </div>
+                  <TrendingUp className="h-8 w-8 text-teal-400" />
+                </div>
+              </Card>
+            </div>
+
+            <Card className="p-6 border-gray-200">
+              <h3 className="text-lg font-semibold mb-4">Category Breakdown</h3>
+              <div className="space-y-3">
+                {Object.entries(itemsByCategory)
+                  .filter(([, items]) => items.length > 0)
+                  .sort((a, b) => b[1].length - a[1].length)
+                  .map(([category, catItems]) => {
+                    const totalValue = catItems.reduce((sum, item) => sum + (parseFloat(item.currentStock) * parseFloat(item.costPerUnit)), 0);
+                    const avgStock = catItems.reduce((sum, item) => sum + parseFloat(item.currentStock), 0) / catItems.length;
+                    return (
+                      <div key={category} className={`p-4 rounded-lg border ${categoryColors[category as keyof typeof categoryColors] || categoryColors["Other"]}`}>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-semibold text-gray-800">{category}</p>
+                            <p className="text-sm text-gray-600">{catItems.length} items • Avg Stock: {avgStock.toFixed(1)}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold text-gray-800">₹{totalValue.toFixed(2)}</p>
+                            <p className="text-sm text-gray-600">Category Value</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </Card>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card className="p-6 border-red-200 bg-gradient-to-br from-red-50 to-red-100">
+                <h3 className="text-lg font-semibold mb-4 text-red-800">Low Stock Alert</h3>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {lowStockItems.length > 0 ? (
+                    lowStockItems.map(item => (
+                      <div key={item.id} className="p-3 bg-white rounded border border-red-200">
+                        <p className="font-medium text-gray-800">{item.name}</p>
+                        <p className="text-sm text-red-600">Stock: {item.currentStock} / Min: {item.minStock} {item.unit}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-red-600 text-sm">All items are well stocked!</p>
                   )}
                 </div>
-              ))}
-            </div>
-          )}
+              </Card>
 
-          {filteredItems.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground">
-              No items found matching your search
+              <Card className="p-6 border-green-200 bg-gradient-to-br from-green-50 to-green-100">
+                <h3 className="text-lg font-semibold mb-4 text-green-800">Top 10 Most Valuable</h3>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {filteredItems
+                    .sort((a, b) => (parseFloat(b.currentStock) * parseFloat(b.costPerUnit)) - (parseFloat(a.currentStock) * parseFloat(a.costPerUnit)))
+                    .slice(0, 10)
+                    .map(item => (
+                      <div key={item.id} className="p-3 bg-white rounded border border-green-200">
+                        <p className="font-medium text-gray-800">{item.name}</p>
+                        <p className="text-sm text-green-600">Value: ₹{(parseFloat(item.currentStock) * parseFloat(item.costPerUnit)).toFixed(2)}</p>
+                      </div>
+                    ))}
+                </div>
+              </Card>
             </div>
-          )}
+          </TabsContent>
         </div>
-      </div>
+      </Tabs>
 
       <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
         <DialogContent className="max-w-md">
@@ -544,12 +703,6 @@ export default function InventoryPage() {
                     <p className="font-semibold">₹{parseFloat(selectedItem.costPerUnit.toString()).toFixed(2)}</p>
                   </div>
                 </div>
-                {selectedItem.supplierId && (
-                  <div>
-                    <p className="text-xs text-muted-foreground">Supplier</p>
-                    <p className="font-semibold">{suppliers.find(s => s.id === selectedItem.supplierId)?.name || "Unknown"}</p>
-                  </div>
-                )}
               </div>
             </div>
           )}
