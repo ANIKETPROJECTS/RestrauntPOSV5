@@ -262,7 +262,7 @@ export default function InventoryPage() {
     return acc;
   }, {} as Record<string, InventoryItem[]>);
 
-  const currentCategoryItems = selectedCategory ? itemsByCategory[selectedCategory] || [] : [];
+  const currentCategoryItems = selectedCategory === "All" ? items : (selectedCategory ? itemsByCategory[selectedCategory] || [] : []);
 
   const lowStockItems = filteredItems.filter(item => {
     const current = item.currentStock != null ? parseFloat(item.currentStock.toString()) : 0;
@@ -345,7 +345,7 @@ export default function InventoryPage() {
                       <ArrowLeft className="h-4 w-4 mr-2" />
                       Back to Categories
                     </Button>
-                    <h2 className="text-2xl font-bold text-gray-800">{selectedCategory}</h2>
+                    <h2 className="text-2xl font-bold text-gray-800">{selectedCategory === "All" ? "All Items" : selectedCategory}</h2>
                   </div>
                 </div>
 
@@ -571,6 +571,14 @@ export default function InventoryPage() {
               </>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                <button
+                  onClick={() => setSelectedCategory("All")}
+                  className="p-4 rounded-lg border-2 text-center transition-all hover:shadow-lg bg-gradient-to-br from-slate-50 to-slate-100 border-slate-300"
+                  data-testid="button-category-All"
+                >
+                  <h3 className="font-semibold text-sm text-gray-800 line-clamp-2 mb-2">All Items</h3>
+                  <Badge variant="secondary" className="text-xs">{items.length}</Badge>
+                </button>
                 {categories.filter(c => c !== "All").map(category => {
                   const catItems = itemsByCategory[category] || [];
                   
