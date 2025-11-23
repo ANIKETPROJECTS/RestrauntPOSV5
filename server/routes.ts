@@ -19,6 +19,7 @@ import {
   insertReservationSchema,
   insertCustomerSchema,
   insertFeedbackSchema,
+  insertInventoryUsageSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { fetchMenuItemsFromMongoDB } from "./mongodbService";
@@ -1756,6 +1757,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete wastage record" });
+    }
+  });
+
+  // Inventory Usage Tracking
+  app.get("/api/inventory-usage", async (req, res) => {
+    try {
+      const usages = await storage.getInventoryUsages();
+      res.json(usages);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch inventory usage" });
+    }
+  });
+
+  app.get("/api/inventory-usage/item/:itemId", async (req, res) => {
+    try {
+      const usages = await storage.getInventoryUsagesByItem(req.params.itemId);
+      res.json(usages);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch item usage" });
+    }
+  });
+
+  app.get("/api/inventory-usage/most-used", async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+      const mostUsed = await storage.getMostUsedItems(limit);
+      res.json(mostUsed);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch most used items" });
+    }
+  });
+
+  app.post("/api/inventory-usage", async (req, res) => {
+    try {
+      const result = insertInventoryUsageSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      const usage = await storage.createInventoryUsage(result.data);
+      broadcastUpdate("inventory_usage_created", usage);
+      res.json(usage);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create inventory usage record" });
     }
   });
 

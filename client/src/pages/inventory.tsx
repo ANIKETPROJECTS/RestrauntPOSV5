@@ -450,15 +450,31 @@ export default function InventoryPage() {
                 <FormField
                   control={form.control}
                   name="unit"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Unit</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="kg, pcs, L" data-testid="input-unit" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    const selectedCategory = form.watch("category");
+                    const availableUnits = selectedCategory && categoryUnits[selectedCategory as keyof typeof categoryUnits]
+                      ? categoryUnits[selectedCategory as keyof typeof categoryUnits]
+                      : ["kg", "g", "L", "ml", "pcs"];
+                    
+                    return (
+                      <FormItem>
+                        <FormLabel>Unit</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-unit">
+                              <SelectValue placeholder="Select unit" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {availableUnits.map(unit => (
+                              <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
 
@@ -619,15 +635,31 @@ export default function InventoryPage() {
                 <FormField
                   control={form.control}
                   name="unit"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Unit</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="kg, pcs, L" data-testid="input-unit" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    const selectedCategory = form.watch("category");
+                    const availableUnits = selectedCategory && categoryUnits[selectedCategory as keyof typeof categoryUnits]
+                      ? categoryUnits[selectedCategory as keyof typeof categoryUnits]
+                      : ["kg", "g", "L", "ml", "pcs"];
+                    
+                    return (
+                      <FormItem>
+                        <FormLabel>Unit</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-unit">
+                              <SelectValue placeholder="Select unit" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {availableUnits.map(unit => (
+                              <SelectItem key={unit} value={unit}>{unit}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
                 />
               </div>
 

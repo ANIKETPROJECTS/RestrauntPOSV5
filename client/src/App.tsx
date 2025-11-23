@@ -21,6 +21,7 @@ import OnlineOrdersPage from "@/pages/online-orders";
 import CustomersPage from "@/pages/customers";
 import LoyaltyPage from "@/pages/loyalty";
 import InventoryPage from "@/pages/inventory";
+import InventoryHistoryPage from "@/pages/inventory-history";
 import PurchaseOrdersPage from "@/pages/purchase-orders";
 import SuppliersPage from "@/pages/suppliers";
 import StaffPage from "@/pages/staff";
@@ -75,6 +76,7 @@ function Router() {
       <Route path="/customers" component={CustomersPage} />
       <Route path="/loyalty" component={LoyaltyPage} />
       <Route path="/inventory" component={InventoryPage} />
+      <Route path="/inventory-history" component={InventoryHistoryPage} />
       <Route path="/purchase-orders" component={PurchaseOrdersPage} />
       <Route path="/suppliers" component={SuppliersPage} />
       <Route path="/staff" component={StaffPage} />
