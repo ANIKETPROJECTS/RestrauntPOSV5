@@ -448,112 +448,123 @@ export default function InventoryPage() {
                 </Table>
               </div>
             ) : (
-              <div className="space-y-4">
-                {Object.entries(itemsByCategory).map(([category, catItems]) => (
-                  <Card
-                    key={category}
-                    className={`overflow-hidden border ${categoryColors[category as keyof typeof categoryColors] || categoryColors["Other"]}`}
-                  >
-                    <button
-                      onClick={() => setExpandedCategories(prev => ({
-                        ...prev,
-                        [category]: !prev[category]
-                      }))}
-                      className="w-full flex items-center justify-between gap-2 p-4 hover:opacity-80 transition-opacity"
-                      data-testid={`button-category-${category}`}
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                  {categories.filter(c => c !== "All").map(category => {
+                    const catItems = itemsByCategory[category] || [];
+                    const isExpanded = expandedCategories[category];
+                    
+                    return (
+                      <button
+                        key={category}
+                        onClick={() => setExpandedCategories(prev => ({
+                          ...prev,
+                          [category]: !prev[category]
+                        }))}
+                        className={`p-4 rounded-lg border-2 text-center transition-all hover:shadow-md ${
+                          isExpanded
+                            ? `${categoryColors[category as keyof typeof categoryColors] || categoryColors["Other"]} border-current`
+                            : `${categoryColors[category as keyof typeof categoryColors] || categoryColors["Other"]} hover:shadow-lg`
+                        }`}
+                        data-testid={`button-category-${category}`}
+                      >
+                        <h3 className="font-semibold text-sm text-gray-800 line-clamp-2 mb-2">{category}</h3>
+                        <Badge variant="secondary" className="text-xs">{catItems.length}</Badge>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {Object.entries(itemsByCategory).map(([category, catItems]) => {
+                  if (!expandedCategories[category]) return null;
+                  
+                  return (
+                    <Card
+                      key={`expanded-${category}`}
+                      className={`overflow-hidden border-2 ${categoryColors[category as keyof typeof categoryColors] || categoryColors["Other"]}`}
                     >
-                      <h3 className="font-semibold text-lg text-gray-800">{category}</h3>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary">{catItems.length} items</Badge>
-                        {expandedCategories[category] ? (
-                          <ChevronUp className="h-4 w-4" />
+                      <div className="p-4 bg-white/50">
+                        <h3 className="font-semibold text-lg text-gray-800 mb-4">{category}</h3>
+                        {catItems.length > 0 ? (
+                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                            {catItems.map(item => (
+                              <Card
+                                key={item.id}
+                                className="overflow-hidden hover:shadow-lg transition-shadow border-0 bg-white"
+                                data-testid={`card-item-${item.id}`}
+                              >
+                                <div className="p-3">
+                                  {item.image ? (
+                                    <div className="h-24 bg-muted rounded mb-2 overflow-hidden">
+                                      <img
+                                        src={item.image}
+                                        alt={item.name}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    </div>
+                                  ) : (
+                                    <div className="h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded mb-2 flex items-center justify-center text-muted-foreground text-xs">
+                                      No image
+                                    </div>
+                                  )}
+                                  <h4 className="font-semibold text-sm line-clamp-2 mb-2 text-gray-800">{item.name}</h4>
+                                  <div className="space-y-1 text-xs mb-3">
+                                    <div className="flex justify-between">
+                                      <span className="text-muted-foreground">Qty:</span>
+                                      <span className={item.currentStock <= item.minStock ? "font-bold text-destructive" : "font-semibold text-green-600"}>
+                                        {item.currentStock} {item.unit}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-muted-foreground">Price:</span>
+                                      <span className="font-semibold text-blue-600">₹{parseFloat(item.costPerUnit.toString()).toFixed(2)}</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="flex-1 h-7 text-xs"
+                                      onClick={() => {
+                                        setSelectedItem(item);
+                                        setIsDetailsDialogOpen(true);
+                                      }}
+                                      data-testid={`button-view-card-${item.id}`}
+                                    >
+                                      <Eye className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="flex-1 h-7 text-xs"
+                                      onClick={() => handleEdit(item)}
+                                      data-testid={`button-edit-card-${item.id}`}
+                                    >
+                                      <Edit className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      className="flex-1 h-7 text-xs"
+                                      onClick={() => deleteMutation.mutate(item.id)}
+                                      data-testid={`button-delete-card-${item.id}`}
+                                    >
+                                      <Trash2 className="h-3 w-3 text-destructive" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              </Card>
+                            ))}
+                          </div>
                         ) : (
-                          <ChevronDown className="h-4 w-4" />
+                          <div className="p-8 text-center text-muted-foreground text-sm">
+                            No items in this category
+                          </div>
                         )}
                       </div>
-                    </button>
-
-                    {expandedCategories[category] && catItems.length > 0 && (
-                      <div className="p-4 bg-white/50">
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                          {catItems.map(item => (
-                            <Card
-                              key={item.id}
-                              className="overflow-hidden hover:shadow-lg transition-shadow border-0 bg-white"
-                              data-testid={`card-item-${item.id}`}
-                            >
-                              <div className="p-3">
-                                {item.image ? (
-                                  <div className="h-24 bg-muted rounded mb-2 overflow-hidden">
-                                    <img
-                                      src={item.image}
-                                      alt={item.name}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  </div>
-                                ) : (
-                                  <div className="h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded mb-2 flex items-center justify-center text-muted-foreground text-xs">
-                                    No image
-                                  </div>
-                                )}
-                                <h4 className="font-semibold text-sm line-clamp-2 mb-2 text-gray-800">{item.name}</h4>
-                                <div className="space-y-1 text-xs mb-3">
-                                  <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Qty:</span>
-                                    <span className={item.currentStock <= item.minStock ? "font-bold text-destructive" : "font-semibold text-green-600"}>
-                                      {item.currentStock} {item.unit}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Price:</span>
-                                    <span className="font-semibold text-blue-600">₹{parseFloat(item.costPerUnit.toString()).toFixed(2)}</span>
-                                  </div>
-                                </div>
-                                <div className="flex gap-1">
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="flex-1 h-7 text-xs"
-                                    onClick={() => {
-                                      setSelectedItem(item);
-                                      setIsDetailsDialogOpen(true);
-                                    }}
-                                    data-testid={`button-view-card-${item.id}`}
-                                  >
-                                    <Eye className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="flex-1 h-7 text-xs"
-                                    onClick={() => handleEdit(item)}
-                                    data-testid={`button-edit-card-${item.id}`}
-                                  >
-                                    <Edit className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="flex-1 h-7 text-xs"
-                                    onClick={() => deleteMutation.mutate(item.id)}
-                                    data-testid={`button-delete-card-${item.id}`}
-                                  >
-                                    <Trash2 className="h-3 w-3 text-destructive" />
-                                  </Button>
-                                </div>
-                              </div>
-                            </Card>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {expandedCategories[category] && catItems.length === 0 && (
-                      <div className="p-8 text-center text-muted-foreground text-sm">
-                        No items in this category
-                      </div>
-                    )}
-                  </Card>
-                ))}
+                    </Card>
+                  );
+                })}
               </div>
             )}
 
