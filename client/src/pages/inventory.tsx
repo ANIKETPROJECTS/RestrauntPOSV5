@@ -652,35 +652,9 @@ export default function InventoryPage() {
             </div>
 
             {/* Charts */}
-            <div className="grid grid-cols-1 gap-6">
-              {/* Category Distribution Bar Chart */}
-              <Card className="p-6 border-2 border-indigo-200">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-indigo-600" />
-                  Items Per Category
-                </h3>
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart
-                    data={Object.entries(itemsByCategory)
-                      .filter(([, items]) => items.length > 0)
-                      .map(([category, items]) => ({
-                        category: category,
-                        count: items.length,
-                      }))
-                      .sort((a, b) => b.count - a.count)}
-                    layout="vertical"
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" />
-                    <YAxis dataKey="category" type="category" width={120} />
-                    <Tooltip formatter={(value) => `${value} items`} />
-                    <Bar dataKey="count" fill="#4F46E5" radius={[0, 8, 8, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </Card>
-
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Category Value Bar Chart */}
-              <Card className="p-6 border-2 border-green-200">
+              <Card className="p-6 border-2 border-green-200 lg:col-span-2">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <TrendingUp className="h-5 w-5 text-green-600" />
                   Inventory Value by Category
@@ -704,36 +678,51 @@ export default function InventoryPage() {
                   </BarChart>
                 </ResponsiveContainer>
               </Card>
-            </div>
 
-            {/* Stock Level Trends */}
-            <Card className="p-6 border-2 border-orange-200">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-orange-600" />
-                Average Stock Levels by Category
-              </h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart
-                  data={Object.entries(itemsByCategory)
-                    .filter(([, items]) => items.length > 0)
-                    .map(([category, items]) => ({
-                      category: category.split(' ')[0],
-                      avgStock: (items.reduce((sum, item) => sum + parseFloat(item.currentStock), 0) / items.length).toFixed(1),
-                      itemCount: items.length,
-                    }))
-                    .sort((a, b) => parseFloat(b.avgStock) - parseFloat(a.avgStock))}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="category" />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <Tooltip />
-                  <Legend />
-                  <Line yAxisId="left" type="monotone" dataKey="avgStock" stroke="#F97316" name="Avg Stock" strokeWidth={2} />
-                  <Line yAxisId="right" type="monotone" dataKey="itemCount" stroke="#3B82F6" name="Item Count" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </Card>
+              {/* Stock Level Trends */}
+              <Card className="p-6 border-2 border-orange-200">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-orange-600" />
+                  Avg Stock Levels
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart
+                    data={Object.entries(itemsByCategory)
+                      .filter(([, items]) => items.length > 0)
+                      .map(([category, items]) => ({
+                        category: category.split(' ')[0],
+                        avgStock: (items.reduce((sum, item) => sum + parseFloat(item.currentStock), 0) / items.length).toFixed(1),
+                      }))
+                      .sort((a, b) => parseFloat(b.avgStock) - parseFloat(a.avgStock))
+                      .slice(0, 8)}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="category" />
+                    <YAxis />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="avgStock" stroke="#F97316" name="Avg Stock" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </Card>
+
+              {/* Total Stock Value Card */}
+              <Card className="p-6 border-2 border-blue-200">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-blue-600" />
+                  Inventory Metrics
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-3 bg-blue-50 rounded">
+                    <span className="text-blue-700 font-medium">Total Stock Value</span>
+                    <span className="text-2xl font-bold text-blue-600">₹{items.reduce((sum, item) => sum + (parseFloat(item.currentStock) * parseFloat(item.costPerUnit)), 0).toFixed(0)}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-green-50 rounded">
+                    <span className="text-green-700 font-medium">Avg Item Value</span>
+                    <span className="text-2xl font-bold text-green-600">₹{(items.length > 0 ? items.reduce((sum, item) => sum + (parseFloat(item.currentStock) * parseFloat(item.costPerUnit)), 0) / items.length : 0).toFixed(0)}</span>
+                  </div>
+                </div>
+              </Card>
+            </div>
 
             {/* Detailed Lists */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
