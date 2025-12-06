@@ -77,7 +77,7 @@ export default function TableCard({
     const updateTime = () => {
       const startTime = new Date(orderStartTime).getTime();
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
-      setElapsedTime(elapsed);
+      setElapsedTime(Math.max(0, elapsed));
     };
 
     updateTime();
