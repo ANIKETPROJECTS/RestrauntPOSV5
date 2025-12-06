@@ -135,6 +135,12 @@ export default function TableCard({
             R
           </div>
         )}
+        {(status === "occupied" || status === "preparing" || status === "ready" || status === "served") && orderStartTime && (
+          <div className="absolute top-1 right-1 z-10 flex items-center gap-1 text-xs font-mono font-semibold text-black">
+            <Clock className="h-3 w-3" />
+            <span>{formatTime(elapsedTime)}</span>
+          </div>
+        )}
         <div className="flex flex-col items-center gap-2">
           <div className={cn(
             "w-16 h-16 rounded-full border-2 flex items-center justify-center transition-all",
@@ -155,12 +161,6 @@ export default function TableCard({
           </div>
           <div className="text-center w-full">
             <p className="text-xs font-semibold uppercase text-black">{config.label}</p>
-            {(status === "occupied" || status === "preparing" || status === "ready" || status === "served") && orderStartTime && (
-              <div className="flex items-center gap-1 justify-center mt-1 text-xs font-mono font-semibold text-black">
-                <Clock className="h-3 w-3" />
-                <span>{formatTime(elapsedTime)}</span>
-              </div>
-            )}
           </div>
         </div>
       </button>
