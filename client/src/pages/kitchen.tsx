@@ -551,14 +551,14 @@ function KitchenOrderCard({
   useEffect(() => {
     if (isPaid && completedTime) {
       const elapsed = Math.floor((completedTime.getTime() - orderTime.getTime()) / 1000);
-      setElapsedTime(elapsed);
+      setElapsedTime(Math.max(0, elapsed));
       orderTimer.wasCompleted = true;
       return;
     }
 
     if (allReadyOrServed) {
       if (orderTimer.pausedAt === null) {
-        orderTimer.pausedAt = Math.floor((Date.now() - orderTimer.startTime) / 1000);
+        orderTimer.pausedAt = Math.max(0, Math.floor((Date.now() - orderTimer.startTime) / 1000));
       }
       setElapsedTime(orderTimer.pausedAt);
       orderTimer.wasCompleted = true;
@@ -569,7 +569,7 @@ function KitchenOrderCard({
 
     const updateTime = () => {
       const elapsed = Math.floor((Date.now() - orderTimer.startTime) / 1000);
-      setElapsedTime(elapsed);
+      setElapsedTime(Math.max(0, elapsed));
     };
 
     updateTime();
