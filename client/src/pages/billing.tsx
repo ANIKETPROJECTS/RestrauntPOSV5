@@ -98,8 +98,26 @@ export default function BillingPage() {
     if (orderId) {
       setCurrentOrderId(orderId);
       fetchExistingOrder(orderId);
+    } else if (tableId) {
+      // If no orderId is provided but we have a tableId, check if the table has an existing order
+      fetchTableOrder(tableId);
     }
   }, []);
+
+  const fetchTableOrder = async (tableId: string) => {
+    try {
+      const tableRes = await fetch(`/api/tables/${tableId}`);
+      if (tableRes.ok) {
+        const table = await tableRes.json();
+        if (table.currentOrderId) {
+          setCurrentOrderId(table.currentOrderId);
+          fetchExistingOrder(table.currentOrderId);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch table order:", error);
+    }
+  };
 
   const fetchExistingOrder = async (orderId: string) => {
     try {

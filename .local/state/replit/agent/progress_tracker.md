@@ -32,3 +32,9 @@
     [x] - Added insertInventoryUsageSchema import to routes.ts
 [x] 597. ✅ ✅ ✅ INVENTORY HISTORY FEATURE FULLY IMPLEMENTED AND OPERATIONAL
 [x] 598. 🎉 🎉 🎉 INVENTORY MANAGEMENT ENHANCEMENTS COMPLETE - All features working
+[x] 599. December 6, 2025 - Fixed served table click handler for digital menu orders:
+    [x] - Updated handleTableClick in tables.tsx to handle served tables without currentOrderId
+    [x] - Added else clause to navigate to billing for any active table (occupied/preparing/ready/served)
+    [x] - Updated billing.tsx to auto-fetch existing order when navigating with tableId but no orderId
+    [x] - Added fetchTableOrder function to check table's currentOrderId and load existing order items
+    [x] - Clicking on served table from digital menu now properly navigates to billing page

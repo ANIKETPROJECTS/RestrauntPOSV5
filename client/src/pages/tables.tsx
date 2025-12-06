@@ -199,6 +199,10 @@ export default function TablesPage() {
       navigate(`/billing?tableId=${table.id}&tableNumber=${table.tableNumber}&floorName=${encodeURIComponent(floorName)}&type=dine-in`);
     } else if (table.currentOrderId) {
       navigate(`/billing?tableId=${table.id}&tableNumber=${table.tableNumber}&floorName=${encodeURIComponent(floorName)}&orderId=${table.currentOrderId}&type=dine-in`);
+    } else {
+      // For occupied/preparing/ready/served tables without a currentOrderId,
+      // this can happen with digital menu orders - navigate to billing to view/manage
+      navigate(`/billing?tableId=${table.id}&tableNumber=${table.tableNumber}&floorName=${encodeURIComponent(floorName)}&type=dine-in`);
     }
   };
 
